@@ -50,7 +50,7 @@ spec:
                     # Pinned EXACTLY to the golden-path reusable workflow on main.
                     # Do NOT broaden this regex without an ADR-0005 amendment
                     # (CLAUDE.md, ADR-0005 consequences).
-                    subjectRegExp: ^https://github\.com/<ORG>/platform-golden-path/\.github/workflows/golden-path\.yml@refs/heads/main$
+                    subjectRegExp: ^https://github\.com/frhnardi/platform-golden-path/\.github/workflows/golden-path\.yml@refs/heads/main$
                     rekor:
                       url: https://rekor.sigstore.dev
                     ctlog:
@@ -74,9 +74,9 @@ spec:
           unknown provenance. Every image must be built and pushed by the
           golden-path pipeline, which signs it keyless with the workflow's GitHub
           OIDC identity (issuer token.actions.githubusercontent.com, subject
-          <ORG>/platform-golden-path/.github/workflows/golden-path.yml@refs/heads/main).
+          frhnardi/platform-golden-path/.github/workflows/golden-path.yml@refs/heads/main).
           Ship it through the paved road:
-          https://github.com/<ORG>/platform-golden-path#quickstart
+          https://github.com/frhnardi/platform-golden-path#quickstart
         deny:
           conditions:
             any:

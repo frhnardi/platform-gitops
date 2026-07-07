@@ -24,7 +24,7 @@ exceptions/            # Kyverno PolicyException resources (each with expiry)
   - `mutateDigest: true`, `verifyDigest: true` — tags are rewritten to digests at admission.
 - Baseline policies run in `Enforce` mode in app namespaces, `Audit` in `kube-system`/platform namespaces. Never flip a policy from Enforce to Audit to "fix" a deployment — that is what `exceptions/` is for.
 - **Every PolicyException must have**: a `spec` scoped to one policy + one workload (no wildcards), an `expires` annotation (ISO date, max 30 days out), a `reason` annotation, and a linked issue/PR. CI must fail if an exception lacks expiry or is already expired.
-- **Denial messages are product copy.** Every `validate.message` must follow: what was rejected → why it matters → exact remediation → doc link. Example: `"Image is not signed by the golden path. Unsigned images can't be traced to a reviewed build. Ship via the golden-path pipeline: https://github.com/<org>/platform-golden-path#quickstart"`.
+- **Denial messages are product copy.** Every `validate.message` must follow: what was rejected → why it matters → exact remediation → doc link. Example: `"Image is not signed by the golden path. Unsigned images can't be traced to a reviewed build. Ship via the golden-path pipeline: https://github.com/frhnardi/platform-golden-path#quickstart"`.
 
 ## Conventions
 

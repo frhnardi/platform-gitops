@@ -9,8 +9,8 @@ anything else, stop: it belongs in git.
 ## Prerequisites
 
 - `kubectl` pointed at the target dev cluster (`kubectl config current-context`).
-- This repo pushed to `https://github.com/<ORG>/platform-gitops` on branch `main`.
-- In [`apps/root.yaml`](../apps/root.yaml), replace `<ORG>` in `repoURL` with your
+- This repo pushed to `https://github.com/frhnardi/platform-gitops` on branch `main`.
+- In [`apps/root.yaml`](../apps/root.yaml), replace `frhnardi` in `repoURL` with your
   GitHub org. ArgoCD pulls the repo over git; it does not read your local files.
 
 ## Steps

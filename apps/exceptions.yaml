@@ -14,8 +14,8 @@ metadata:
 spec:
   project: default
   source:
-    # Replace <ORG> with your GitHub org (see docs/bootstrap.md).
-    repoURL: https://github.com/<ORG>/platform-gitops.git
+    # Replace frhnardi with your GitHub org (see docs/bootstrap.md).
+    repoURL: https://github.com/frhnardi/platform-gitops.git
     targetRevision: main
     path: exceptions
   destination:

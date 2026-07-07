@@ -34,7 +34,7 @@ spec:
           spec.securityContext.runAsNonRoot: true for the whole pod (add
           runAsUser: 65532 if the image defaults to root), or set it on every
           container's securityContext. Guide:
-          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#run-as-non-root
+          https://github.com/frhnardi/platform-gitops/blob/main/policies/baseline/README.md#run-as-non-root
         anyPattern:
           # Either the pod sets it once for all containers...
           - spec:

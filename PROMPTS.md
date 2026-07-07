@@ -30,7 +30,7 @@ Acceptance: all Chainsaw tests pass locally against a kind cluster (include a ma
 ```
 Implement policies/supply-chain/verify-image-signature.yaml per ADR-0005:
 - verifyImages, Enforce, apps namespace
-- attestors: keyless, issuer https://token.actions.githubusercontent.com, subject regexp pinned EXACTLY to <ORG>/platform-golden-path/.github/workflows/golden-path.yml@refs/heads/main
+- attestors: keyless, issuer https://token.actions.githubusercontent.com, subject regexp pinned EXACTLY to frhnardi/platform-golden-path/.github/workflows/golden-path.yml@refs/heads/main
 - mutateDigest: true, verifyDigest: true, required: true
 Also verify-sbom-attestation.yaml requiring the SPDX attestation from the same identity.
 Chainsaw tests: signed image admitted, unsigned rejected, image signed by a DIFFERENT workflow identity rejected (this third case is the one that proves the design — do not skip it).

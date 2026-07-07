@@ -36,7 +36,7 @@ spec:
           Remove the field (or set securityContext.privileged: false) and, if you
           genuinely need a kernel privilege, add back only that one capability
           under securityContext.capabilities.add. Guide:
-          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#disallow-privileged-containers
+          https://github.com/frhnardi/platform-gitops/blob/main/policies/baseline/README.md#disallow-privileged-containers
         pattern:
           spec:
             =(ephemeralContainers):

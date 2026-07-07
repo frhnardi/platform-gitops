@@ -61,7 +61,7 @@ metadata:
     paved-road.platform/reason: >-
       checkout-api writes its JIT cache to /var/cache at startup; fix (emptyDir
       mount) is merged but blocked on the v1.9 release train.
-    paved-road.platform/issue: https://github.com/<ORG>/checkout-api/issues/142
+    paved-road.platform/issue: https://github.com/frhnardi/checkout-api/issues/142
 spec:
   exceptions:
     - policyName: require-readonly-rootfs

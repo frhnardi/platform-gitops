@@ -16,7 +16,7 @@ with what this cluster says:
 > `This image is not signed by the golden path, so the cluster can't prove it
 > came from a reviewed, policy-gated build — and it will not run code of
 > unknown provenance. … Ship it through the paved road:
-> https://github.com/<ORG>/platform-golden-path#quickstart`
+> https://github.com/frhnardi/platform-golden-path#quickstart`
 
 Same rejection. One is a stack trace; the other is a signpost. That difference
 is the whole adoption strategy of a paved road: **the guardrail must point at

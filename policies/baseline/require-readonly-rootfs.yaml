@@ -34,7 +34,7 @@ spec:
           running container. Set securityContext.readOnlyRootFilesystem: true and
           mount an emptyDir (or a real volume) for the specific paths your app must
           write, e.g. /tmp or a cache dir. Guide:
-          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#read-only-root-filesystem
+          https://github.com/frhnardi/platform-gitops/blob/main/policies/baseline/README.md#read-only-root-filesystem
         pattern:
           spec:
             containers:

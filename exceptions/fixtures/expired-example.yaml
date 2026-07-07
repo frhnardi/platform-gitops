@@ -12,7 +12,7 @@ metadata:
     paved-road.platform/reason: >-
       Example workload wrote scratch data to /tmp on the root filesystem; the
       emptyDir fix shipped in v1.3.0. This exception covered the gap.
-    paved-road.platform/issue: https://github.com/<ORG>/example-service/issues/7
+    paved-road.platform/issue: https://github.com/frhnardi/example-service/issues/7
 spec:
   exceptions:
     - policyName: require-readonly-rootfs

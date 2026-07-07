@@ -32,7 +32,7 @@ spec:
           different code. Pin an explicit version, e.g. registry.example.com/app:1.4.2.
           Better: ship through the golden path, which rewrites tags to immutable
           digests at build time. Guide:
-          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#pin-image-tags-no-latest
+          https://github.com/frhnardi/platform-gitops/blob/main/policies/baseline/README.md#pin-image-tags-no-latest
         foreach:
           - list: request.object.spec.containers
             pattern:
@@ -58,7 +58,7 @@ spec:
           so the cluster can't tell you which build is actually running and can't
           reproduce an incident. Pin an explicit version tag (e.g. app:1.4.2), or
           ship through the golden path, which pins images by digest. Guide:
-          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#pin-image-tags-no-latest
+          https://github.com/frhnardi/platform-gitops/blob/main/policies/baseline/README.md#pin-image-tags-no-latest
         foreach:
           - list: request.object.spec.containers
             pattern:

@@ -42,7 +42,7 @@ spec:
                   entries:
                     - keyless:
                         issuer: https://token.actions.githubusercontent.com
-                        subjectRegExp: ^https://github\.com/<ORG>/platform-golden-path/\.github/workflows/golden-path\.yml@refs/heads/main$
+                        subjectRegExp: ^https://github\.com/frhnardi/platform-golden-path/\.github/workflows/golden-path\.yml@refs/heads/main$
                         rekor:
                           url: https://rekor.sigstore.dev
                         ctlog:
@@ -66,7 +66,7 @@ spec:
           golden-path pipeline generates an SPDX SBOM with Syft and attaches it as
           a keyless-signed attestation (cosign attest --type spdx). Ship it through
           the paved road:
-          https://github.com/<ORG>/platform-golden-path#quickstart
+          https://github.com/frhnardi/platform-golden-path#quickstart
         deny:
           conditions:
             any:

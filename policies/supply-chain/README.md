@@ -15,7 +15,7 @@ Both policies admit only images whose signature/attestation certificate was
 issued to the golden-path reusable workflow:
 
 - **issuer:** `https://token.actions.githubusercontent.com` (GitHub Actions OIDC)
-- **subject:** `https://github.com/<ORG>/platform-golden-path/.github/workflows/golden-path.yml@refs/heads/main`
+- **subject:** `https://github.com/frhnardi/platform-golden-path/.github/workflows/golden-path.yml@refs/heads/main`
 
 This is the whole security claim (ADR-0005): not "signed with our key" but
 "provably produced by the reviewed pipeline." The subject regex is

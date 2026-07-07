@@ -39,7 +39,7 @@ spec:
           Drop everything and add back only what you need:
           securityContext.capabilities.drop: ["ALL"] (then, if required,
           capabilities.add: ["NET_BIND_SERVICE"]). Guide:
-          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#drop-all-capabilities
+          https://github.com/frhnardi/platform-gitops/blob/main/policies/baseline/README.md#drop-all-capabilities
         foreach:
           - list: request.object.spec.[ephemeralContainers, initContainers, containers][]
             deny:

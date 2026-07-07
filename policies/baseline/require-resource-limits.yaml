@@ -33,7 +33,7 @@ spec:
           turning one bad pod into a cluster incident. Set both, for example:
           resources.limits.cpu: 500m and resources.limits.memory: 256Mi (and a
           matching requests block so the scheduler can bin-pack). Guide:
-          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#require-resource-limits
+          https://github.com/frhnardi/platform-gitops/blob/main/policies/baseline/README.md#require-resource-limits
         pattern:
           spec:
             containers:
