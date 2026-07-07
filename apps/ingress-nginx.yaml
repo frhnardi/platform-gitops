@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # Ingress NGINX controller — the cluster's edge proxy. Deployed as a raw
+  # manifest (not Helm) so the deployment is fully GitOps-managed and the
+  # initContainer fix persists through any sync/self-heal cycle.
+  #
+  # Sync-wave "0" so it reconciles BEFORE Kyverno policies (wave 1) — ingress
+  # must be ready for ArgoCD itself and any webhook-validating workloads.
+  name: ingress-nginx
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/frhnardi/platform-gitops.git
+    targetRevision: main
+    path: apps/ingress-nginx
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+  syncPolicy:
+    # Platform app policy: automated with prune + selfHeal.
+    # prune: true is safe here — the namespace was created manually
+    # and its resources (deployment, service, ingress rules) are
+    # fully defined in this app directory.
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
