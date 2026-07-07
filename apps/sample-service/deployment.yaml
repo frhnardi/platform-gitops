@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-service
+  labels:
+    app.kubernetes.io/name: sample-service
+    app.kubernetes.io/part-of: platform-gitops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sample-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sample-service
+    spec:
+      # Pod-level context satisfies require-run-as-nonroot for every container.
+      # 65532 is the distroless "nonroot" UID/GID the service image runs as.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: sample-service
+          # Bare name on purpose: the kustomize images: transformer rewrites this
+          # to the ACR path pinned by digest. The golden-path promotion PR sets
+          # that digest — never a tag (disallow-latest-tag + provenance).
+          image: sample-service
+          ports:
+            - name: http
+              containerPort: 8080
+          # Container context satisfies drop-all-capabilities,
+          # require-readonly-rootfs, and disallow-privileged.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          # require-resource-limits: both cpu and memory limits are mandatory.
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          # readOnlyRootFilesystem is true, so give the process a writable /tmp
+          # via an ephemeral volume rather than a writable image layer.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
