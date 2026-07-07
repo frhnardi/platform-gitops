@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Cluster-scoped namespaces, applied once at bootstrap (before ArgoCD exists).
+# They are declared in git so the desired state stays the source of truth even
+# though the argocd namespace must physically exist before ArgoCD can be
+# installed into it. `tier` distinguishes Enforce (app) from Audit (platform).
+resources:
+  - argocd.yaml
+  - kyverno.yaml
+  - apps.yaml

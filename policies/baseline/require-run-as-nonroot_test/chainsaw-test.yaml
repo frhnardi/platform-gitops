@@ -1,0 +1,29 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-run-as-nonroot
+spec:
+  namespaceTemplate:
+    metadata:
+      labels:
+        paved-road.platform/tier: app
+  steps:
+    - name: install-policy
+      try:
+        - apply:
+            file: ../require-run-as-nonroot.yaml
+        - script:
+            content: kubectl wait --for=condition=Ready --timeout=90s clusterpolicy/require-run-as-nonroot
+        - sleep:
+            duration: 3s
+    - name: nonroot-pod-is-admitted
+      try:
+        - apply:
+            file: good-pod.yaml
+    - name: root-capable-pod-is-rejected
+      try:
+        - apply:
+            file: bad-pod.yaml
+            expect:
+              - check:
+                  ($error != null): true

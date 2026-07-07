@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # Kyverno — the admission engine that enforces the golden path. Deployed from
+  # the official upstream chart, pinned. Managed by the app-of-apps root.
+  name: kyverno
+  namespace: argocd
+  annotations:
+    # Wave 0: install Kyverno (and its CRDs) before the policies app (wave 1).
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Official Kyverno Helm chart (consuming an upstream chart via ArgoCD is
+    # allowed; CLAUDE.md only forbids authoring Helm charts in this repo).
+    repoURL: https://kyverno.github.io/kyverno/
+    chart: kyverno
+    targetRevision: 3.8.1 # chart 3.8.1 == Kyverno app v1.18.1
+    helm:
+      releaseName: kyverno
+      valuesObject:
+        features:
+          # The escape hatch (exceptions/): off by default in the chart. Honor
+          # PolicyExceptions ONLY from the kyverno namespace, which is populated
+          # exclusively by ArgoCD from exceptions/ — no hand-applied waivers.
+          policyExceptions:
+            enabled: true
+            namespace: kyverno
+        # Dev is cost-constrained (ADR-0002): one replica per controller.
+        # A prod overlay would restore the chart's HA defaults.
+        admissionController:
+          replicas: 1
+        backgroundController:
+          replicas: 1
+        cleanupController:
+          replicas: 1
+        reportsController:
+          replicas: 1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    # Platform app policy (CLAUDE.md): automated with prune + selfHeal.
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Kyverno's CRDs exceed the client-side apply annotation size limit;
+      # server-side apply is required for a clean sync.
+      - ServerSideApply=true

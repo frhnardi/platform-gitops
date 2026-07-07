@@ -1,0 +1,62 @@
+# TEST FIXTURE ONLY — not shipped, not in any kustomization.
+#
+# Structurally identical to ../verify-image-signature.yaml (Audit verify +
+# Enforce validate), but pinned to a real, public keyless-signed image:
+# ghcr.io/kyverno/zulu, signed by chipzoller/zulu (the fixture Kyverno uses in
+# its own conformance suite). Swap the identity + imageReferences and this IS the
+# production policy. Lets us prove a correctly-signed image is ADMITTED locally,
+# which the golden-path identity can't do without the real pipeline (Phase 2).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-signature-stand-in
+spec:
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  background: false
+  rules:
+    - name: verify-zulu-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/kyverno/zulu:*"
+          failureAction: Audit
+          required: true
+          mutateDigest: false
+          verifyDigest: false
+          attestors:
+            - count: 1
+              entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subjectRegExp: ^https://github\.com/chipzoller/zulu/\.github/workflows/slsa-generic-keyless\.yaml@refs/tags/v.+$
+                    rekor:
+                      url: https://rekor.sigstore.dev
+                    ctlog:
+                      ignoreSCT: true
+    - name: require-zulu-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      validate:
+        failureAction: Enforce
+        message: >-
+          stand-in: image not signed by the expected identity.
+        deny:
+          conditions:
+            any:
+              - key: fail
+                operator: AnyIn
+                value: '{{ (request.object.metadata.annotations."kyverno.io/verify-images" || ''{}'') | parse_json(@) | values(@) }}'

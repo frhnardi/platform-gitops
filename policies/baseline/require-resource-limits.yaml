@@ -1,0 +1,53 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Limits
+    policies.kyverno.io/category: Pod Security Baseline
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Requires every container to declare CPU and memory limits so a single
+      workload can't starve its neighbours or destabilise the node.
+spec:
+  background: true
+  rules:
+    - name: validate-resource-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaceSelector:
+              matchLabels:
+                paved-road.platform/tier: app
+        message: >-
+          Container is missing resources.limits.cpu and/or resources.limits.memory.
+          Without limits a workload can consume the whole node — a memory leak
+          triggers node-wide OOM kills and CPU spikes throttle every neighbour,
+          turning one bad pod into a cluster incident. Set both, for example:
+          resources.limits.cpu: 500m and resources.limits.memory: 256Mi (and a
+          matching requests block so the scheduler can bin-pack). Guide:
+          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#require-resource-limits
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"
+            =(initContainers):
+              - resources:
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"
+            =(ephemeralContainers):
+              - resources:
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"

@@ -1,0 +1,10 @@
+# zulu has CycloneDX + SLSA + vuln attestations, but no SPDX Document signed by
+# the golden-path identity -> rejected.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: wrong-identity
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/kyverno/zulu:v0.0.14

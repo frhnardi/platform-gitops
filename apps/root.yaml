@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # The app-of-apps root. Applied once by a human at bootstrap; from then on it
+  # reconciles every Application manifest in apps/ — adding a file here is how a
+  # new platform component gets deployed. It also manages itself (this file is
+  # in the directory it watches), so edits to root land via GitOps too.
+  name: root
+  namespace: argocd
+  finalizers:
+    # Cascade delete: removing this Application also removes the children it owns.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Replace <ORG> with your GitHub org (see docs/bootstrap.md).
+    repoURL: https://github.com/<ORG>/platform-gitops.git
+    targetRevision: main
+    path: apps
+    directory:
+      # Every *.yaml directly under apps/ is a child Application. No recursion —
+      # subdirectories (if any) are left for their own apps to claim.
+      recurse: false
+      include: "*.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    # Child Application CRs live in argocd; ArgoCD only watches its own namespace.
+    namespace: argocd
+  syncPolicy:
+    # Platform app policy (CLAUDE.md): automated with prune + selfHeal.
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true

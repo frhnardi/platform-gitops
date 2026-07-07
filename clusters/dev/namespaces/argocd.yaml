@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    # Platform tier: baseline policies run in Audit here, never Enforce
+    # (see CLAUDE.md — Enforce in app namespaces, Audit in platform ones).
+    paved-road.platform/tier: platform
+    app.kubernetes.io/part-of: platform-gitops

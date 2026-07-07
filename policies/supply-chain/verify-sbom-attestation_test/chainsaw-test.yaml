@@ -1,0 +1,40 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: verify-sbom-attestation
+# Tests the REAL shipping SBOM policy (../verify-sbom-attestation.yaml, pinned
+# to the golden-path identity + SPDX). The admit path is proven against a real
+# attested public image in verify-sbom-attestation-admit_test.
+spec:
+  timeouts:
+    apply: 90s
+    assert: 90s
+    exec: 150s
+  namespaceTemplate:
+    metadata:
+      labels:
+        paved-road.platform/tier: app
+  steps:
+    - name: install-policy
+      try:
+        - apply:
+            file: ../verify-sbom-attestation.yaml
+        - script:
+            content: kubectl wait --for=condition=Ready --timeout=120s clusterpolicy/verify-sbom-attestation
+    - name: image-without-any-attestation-is-rejected
+      try:
+        - apply:
+            file: no-attestation-pod.yaml
+            expect:
+              - check:
+                  ($error != null): true
+                  (contains($error, 'platform-golden-path')): true
+    - name: attestation-from-a-different-identity-is-rejected
+      try:
+        # zulu HAS attestations, but no SPDX doc signed by the golden path.
+        - apply:
+            file: wrong-identity-pod.yaml
+            expect:
+              - check:
+                  ($error != null): true
+                  (contains($error, 'platform-golden-path')): true

@@ -1,0 +1,68 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Tag
+    policies.kyverno.io/category: Pod Security Baseline
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Requires every image to carry an explicit, non-`latest` tag. Mutable tags
+      make a deployment non-reproducible and untraceable to a reviewed build.
+spec:
+  background: true
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaceSelector:
+              matchLabels:
+                paved-road.platform/tier: app
+        message: >-
+          Image reference has no tag, so it resolves to :latest. An untagged image
+          can't be reproduced or rolled back — two deploys minutes apart may run
+          different code. Pin an explicit version, e.g. registry.example.com/app:1.4.2.
+          Better: ship through the golden path, which rewrites tags to immutable
+          digests at build time. Guide:
+          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#pin-image-tags-no-latest
+        foreach:
+          - list: request.object.spec.containers
+            pattern:
+              image: "*:*"
+          - list: request.object.spec.[initContainers, ephemeralContainers][]
+            pattern:
+              image: "*:*"
+    - name: disallow-latest-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaceSelector:
+              matchLabels:
+                paved-road.platform/tier: app
+        message: >-
+          Image uses the mutable :latest tag. :latest points at a moving target,
+          so the cluster can't tell you which build is actually running and can't
+          reproduce an incident. Pin an explicit version tag (e.g. app:1.4.2), or
+          ship through the golden path, which pins images by digest. Guide:
+          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#pin-image-tags-no-latest
+        foreach:
+          - list: request.object.spec.containers
+            pattern:
+              image: "!*:latest"
+          - list: request.object.spec.[initContainers, ephemeralContainers][]
+            pattern:
+              image: "!*:latest"

@@ -1,0 +1,6 @@
+# Pinned kind/chainsaw binaries downloaded by `make tools` / `make test-policies`.
+.tools/
+
+# Python bytecode cache from the exception-validation scripts.
+__pycache__/
+*.pyc

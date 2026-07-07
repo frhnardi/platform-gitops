@@ -1,0 +1,29 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-readonly-rootfs
+spec:
+  namespaceTemplate:
+    metadata:
+      labels:
+        paved-road.platform/tier: app
+  steps:
+    - name: install-policy
+      try:
+        - apply:
+            file: ../require-readonly-rootfs.yaml
+        - script:
+            content: kubectl wait --for=condition=Ready --timeout=90s clusterpolicy/require-readonly-rootfs
+        - sleep:
+            duration: 3s
+    - name: readonly-rootfs-pod-is-admitted
+      try:
+        - apply:
+            file: good-pod.yaml
+    - name: writable-rootfs-pod-is-rejected
+      try:
+        - apply:
+            file: bad-pod.yaml
+            expect:
+              - check:
+                  ($error != null): true

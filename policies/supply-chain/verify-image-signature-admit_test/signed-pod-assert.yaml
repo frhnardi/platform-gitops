@@ -1,0 +1,8 @@
+# Kyverno records the verification verdict per image; "pass" here is what the
+# Enforce validate rule admits on. (Exact value verified against Kyverno 1.18.1.)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: signed
+  annotations:
+    kyverno.io/verify-images: '{"ghcr.io/kyverno/zulu:v0.0.14":"pass"}'

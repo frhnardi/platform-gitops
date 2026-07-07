@@ -1,0 +1,28 @@
+# Broken field: image uses the mutable :latest tag.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: violating
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:latest
+      securityContext:
+        privileged: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        limits:
+          cpu: 50m
+          memory: 64Mi
+        requests:
+          cpu: 10m
+          memory: 32Mi

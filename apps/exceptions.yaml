@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # PolicyExceptions — the escape hatch (exceptions/). Managed by the
+  # app-of-apps root. prune: true is load-bearing here: deleting an expired
+  # exception file from git is what removes the waiver from the cluster.
+  name: exceptions
+  namespace: argocd
+  annotations:
+    # Same wave as policies: needs the Kyverno CRDs from wave 0.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Replace <ORG> with your GitHub org (see docs/bootstrap.md).
+    repoURL: https://github.com/<ORG>/platform-gitops.git
+    targetRevision: main
+    path: exceptions
+  destination:
+    server: https://kubernetes.default.svc
+    # The only namespace Kyverno honors exceptions from (see apps/kyverno.yaml).
+    namespace: kyverno
+  syncPolicy:
+    # Platform app policy (CLAUDE.md): automated with prune + selfHeal.
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

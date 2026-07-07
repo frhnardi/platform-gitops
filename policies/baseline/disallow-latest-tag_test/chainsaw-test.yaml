@@ -1,0 +1,29 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: disallow-latest-tag
+spec:
+  namespaceTemplate:
+    metadata:
+      labels:
+        paved-road.platform/tier: app
+  steps:
+    - name: install-policy
+      try:
+        - apply:
+            file: ../disallow-latest-tag.yaml
+        - script:
+            content: kubectl wait --for=condition=Ready --timeout=90s clusterpolicy/disallow-latest-tag
+        - sleep:
+            duration: 3s
+    - name: tagged-image-is-admitted
+      try:
+        - apply:
+            file: good-pod.yaml
+    - name: latest-tag-is-rejected
+      try:
+        - apply:
+            file: bad-pod.yaml
+            expect:
+              - check:
+                  ($error != null): true

@@ -1,0 +1,32 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: disallow-privileged
+spec:
+  # The ephemeral test namespace is labelled app-tier so the policy's Enforce
+  # override kicks in here (elsewhere it is Audit and would admit the bad pod).
+  namespaceTemplate:
+    metadata:
+      labels:
+        paved-road.platform/tier: app
+  steps:
+    - name: install-policy
+      try:
+        - apply:
+            file: ../disallow-privileged.yaml
+        - script:
+            content: kubectl wait --for=condition=Ready --timeout=90s clusterpolicy/disallow-privileged
+        # Let the admission webhook registration settle before probing it.
+        - sleep:
+            duration: 3s
+    - name: compliant-pod-is-admitted
+      try:
+        - apply:
+            file: good-pod.yaml
+    - name: privileged-pod-is-rejected
+      try:
+        - apply:
+            file: bad-pod.yaml
+            expect:
+              - check:
+                  ($error != null): true

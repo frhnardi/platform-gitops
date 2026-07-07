@@ -1,0 +1,29 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: drop-all-capabilities
+spec:
+  namespaceTemplate:
+    metadata:
+      labels:
+        paved-road.platform/tier: app
+  steps:
+    - name: install-policy
+      try:
+        - apply:
+            file: ../drop-all-capabilities.yaml
+        - script:
+            content: kubectl wait --for=condition=Ready --timeout=90s clusterpolicy/drop-all-capabilities
+        - sleep:
+            duration: 3s
+    - name: pod-dropping-all-is-admitted
+      try:
+        - apply:
+            file: good-pod.yaml
+    - name: pod-not-dropping-all-is-rejected
+      try:
+        - apply:
+            file: bad-pod.yaml
+            expect:
+              - check:
+                  ($error != null): true

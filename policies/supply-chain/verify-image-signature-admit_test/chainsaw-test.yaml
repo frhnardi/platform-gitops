@@ -1,0 +1,32 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: verify-image-signature-admit
+# Proves a correctly-signed image is admitted, and that Kyverno recorded the
+# verification as a pass. Uses the stand-in policy (real zulu identity).
+spec:
+  timeouts:
+    apply: 90s
+    assert: 90s
+    exec: 150s
+  namespaceTemplate:
+    metadata:
+      labels:
+        paved-road.platform/tier: app
+  steps:
+    - name: install-stand-in-policy
+      try:
+        - apply:
+            file: policy.yaml
+        - script:
+            content: kubectl wait --for=condition=Ready --timeout=120s clusterpolicy/verify-signature-stand-in
+    - name: signed-image-is-admitted-with-pass-recorded
+      try:
+        - apply:
+            file: signed-pod.yaml
+        # Admission passed AND the verify rule recorded "pass" for the image in
+        # the kyverno.io/verify-images annotation — the signal the Enforce
+        # validate rule keys off. Had verification failed, the validate rule
+        # would have denied the pod and this assert could never succeed.
+        - assert:
+            file: signed-pod-assert.yaml

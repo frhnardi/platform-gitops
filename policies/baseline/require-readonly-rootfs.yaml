@@ -1,0 +1,48 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-readonly-rootfs
+  annotations:
+    policies.kyverno.io/title: Require Read-Only Root Filesystem
+    policies.kyverno.io/category: Pod Security Baseline
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Requires readOnlyRootFilesystem: true on every container so the container
+      image is immutable at runtime; writable paths must be explicit volumes.
+spec:
+  background: true
+  rules:
+    - name: validate-readonly-rootfs
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaceSelector:
+              matchLabels:
+                paved-road.platform/tier: app
+        message: >-
+          Container has a writable root filesystem:
+          securityContext.readOnlyRootFilesystem is not set to true. A writable
+          rootfs lets an attacker who lands code execution drop a binary, patch a
+          config, or install a persistence mechanism that survives inside the
+          running container. Set securityContext.readOnlyRootFilesystem: true and
+          mount an emptyDir (or a real volume) for the specific paths your app must
+          write, e.g. /tmp or a cache dir. Guide:
+          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#read-only-root-filesystem
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  readOnlyRootFilesystem: true
+            =(initContainers):
+              - securityContext:
+                  readOnlyRootFilesystem: true
+            =(ephemeralContainers):
+              - securityContext:
+                  readOnlyRootFilesystem: true

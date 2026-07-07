@@ -1,0 +1,63 @@
+# TEST FIXTURE ONLY — not shipped, not in any kustomization.
+#
+# Structurally identical to ../verify-sbom-attestation.yaml (Audit verify +
+# Enforce validate), but pinned to a real public attestation we can verify
+# locally: ghcr.io/kyverno/zulu's CycloneDX SBOM attestation, signed keyless by
+# chipzoller/zulu. Production requires an SPDX document from the golden-path
+# identity; swap the type + identity and this IS the production policy.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-sbom-stand-in
+spec:
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  background: false
+  rules:
+    - name: verify-zulu-sbom
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/kyverno/zulu:*"
+          failureAction: Audit
+          required: true
+          mutateDigest: false
+          verifyDigest: false
+          attestations:
+            - type: https://cyclonedx.org/schema
+              attestors:
+                - count: 1
+                  entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: ^https://github\.com/chipzoller/zulu/\.github/workflows/slsa-generic-keyless\.yaml@refs/tags/v.+$
+                        rekor:
+                          url: https://rekor.sigstore.dev
+                        ctlog:
+                          ignoreSCT: true
+    - name: require-zulu-sbom
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      validate:
+        failureAction: Enforce
+        message: >-
+          stand-in: image lacks the expected SBOM attestation.
+        deny:
+          conditions:
+            any:
+              - key: fail
+                operator: AnyIn
+                value: '{{ (request.object.metadata.annotations."kyverno.io/verify-images" || ''{}'') | parse_json(@) | values(@) }}'

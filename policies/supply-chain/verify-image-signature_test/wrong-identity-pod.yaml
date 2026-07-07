@@ -1,0 +1,11 @@
+# ghcr.io/kyverno/zulu IS keyless-signed — but by chipzoller/zulu, NOT the
+# golden-path workflow. This is the case that proves the design: a validly
+# signed image with the wrong identity must still be rejected.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: wrong-identity
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/kyverno/zulu:v0.0.14

@@ -1,0 +1,37 @@
+name: exceptions-ci
+
+# The escape hatch is code: every PolicyException is validated on every PR that
+# touches it, and the whole repo re-validates on main — so an exception that
+# expires while sitting on main turns the build red until it is removed.
+on:
+  pull_request:
+    paths:
+      - "exceptions/**"
+      - "scripts/**"
+      - ".github/workflows/exceptions-ci.yml"
+  push:
+    branches: [main]
+  schedule:
+    # Daily: expiry is a function of time, not of commits. Without this, an
+    # exception could expire silently between pushes.
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exceptions-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-exceptions:
+    name: validate PolicyExceptions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install the validator's one dependency (pinned)
+        run: python3 -m pip install --quiet pyyaml==6.0.2
+      - name: Unit-test the validator
+        run: python3 -m unittest discover -s scripts -v
+      - name: Validate every exception in exceptions/
+        run: python3 scripts/validate_exceptions.py exceptions

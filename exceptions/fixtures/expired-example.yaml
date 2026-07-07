@@ -1,0 +1,29 @@
+# TEST FIXTURE — deliberately EXPIRED (expires 2026-06-15, in the past).
+# Used by scripts/test_validate_exceptions.py to prove the CI check fails on an
+# expired exception still present in the repo. Not listed in the live
+# kustomization; never reaches the cluster. Everything except the date is valid.
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: expired-example
+  namespace: kyverno
+  annotations:
+    paved-road.platform/expires: "2026-06-15"
+    paved-road.platform/reason: >-
+      Example workload wrote scratch data to /tmp on the root filesystem; the
+      emptyDir fix shipped in v1.3.0. This exception covered the gap.
+    paved-road.platform/issue: https://github.com/<ORG>/example-service/issues/7
+spec:
+  exceptions:
+    - policyName: require-readonly-rootfs
+      ruleNames:
+        - autogen-validate-readonly-rootfs
+  match:
+    any:
+      - resources:
+          kinds:
+            - Deployment
+          names:
+            - example-service
+          namespaces:
+            - apps

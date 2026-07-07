@@ -1,0 +1,30 @@
+# Golden pod: hardened against all six baseline policies, so this manifest is
+# admitted no matter which policies are active. Each bad-pod.yaml is this spec
+# with exactly one field broken.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: compliant
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+      securityContext:
+        privileged: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        limits:
+          cpu: 50m
+          memory: 64Mi
+        requests:
+          cpu: 10m
+          memory: 32Mi

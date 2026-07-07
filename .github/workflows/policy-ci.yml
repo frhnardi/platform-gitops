@@ -1,0 +1,48 @@
+name: policy-ci
+
+# Gate on every change to the desired state or the policies that guard it.
+on:
+  pull_request:
+    paths:
+      - "policies/**"
+      - "clusters/**"
+      - "apps/**"
+      - "Makefile"
+      - ".github/workflows/policy-ci.yml"
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: policy-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kustomize-build:
+    name: kustomize build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+        with:
+          version: v1.33.3
+      - name: kustomize build every overlay
+        run: make build
+
+  chainsaw-test:
+    name: chainsaw (kind + kyverno)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+        with:
+          version: v1.33.3
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.15.2
+      # Downloads the pinned kind + chainsaw, creates a throwaway cluster,
+      # installs the pinned Kyverno, and runs the suite next to each policy.
+      - name: make test-policies
+        run: make test-policies

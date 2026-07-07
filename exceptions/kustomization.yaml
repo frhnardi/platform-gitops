@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Live PolicyExceptions, shipped by ArgoCD (apps/exceptions.yaml) into the
+# kyverno namespace — the only namespace Kyverno honors exceptions from.
+# Add each approved exception file here; deleting the file (and this entry) on
+# expiry is what removes it from the cluster (prune: true).
+# fixtures/ is test data for scripts/validate_exceptions.py — never list it.
+namespace: kyverno
+resources: []

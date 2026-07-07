@@ -1,0 +1,28 @@
+# Broken field: readOnlyRootFilesystem is false, so the container rootfs is writable.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: violating
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+      securityContext:
+        privileged: false
+        readOnlyRootFilesystem: false
+        runAsNonRoot: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        limits:
+          cpu: 50m
+          memory: 64Mi
+        requests:
+          cpu: 10m
+          memory: 32Mi

@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Baseline pod-security policies. Each runs Audit cluster-wide and Enforce in
+# namespaces labelled paved-road.platform/tier=app. The *_test/ folders next to
+# these files are Chainsaw tests and are intentionally NOT listed here, so they
+# never reach the cluster.
+resources:
+  - disallow-privileged.yaml
+  - disallow-latest-tag.yaml
+  - require-resource-limits.yaml
+  - require-run-as-nonroot.yaml
+  - drop-all-capabilities.yaml
+  - require-readonly-rootfs.yaml

@@ -1,0 +1,42 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: verify-image-signature
+# Tests the REAL shipping policy (../verify-image-signature.yaml, pinned to the
+# golden-path identity). Since no golden-path-signed image exists locally, this
+# folder proves the two rejections; the admit + digest-pin path is proven in
+# verify-image-signature-admit_test against a real signed public image.
+spec:
+  # verifyImages admission calls out to Rekor/Fulcio — give it room.
+  timeouts:
+    apply: 90s
+    assert: 90s
+    exec: 150s
+  namespaceTemplate:
+    metadata:
+      labels:
+        paved-road.platform/tier: app
+  steps:
+    - name: install-policy
+      try:
+        - apply:
+            file: ../verify-image-signature.yaml
+        - script:
+            content: kubectl wait --for=condition=Ready --timeout=120s clusterpolicy/verify-image-signature
+    - name: unsigned-image-is-rejected
+      try:
+        - apply:
+            file: unsigned-pod.yaml
+            expect:
+              - check:
+                  # Rejected, and the denial must carry the golden-path link.
+                  ($error != null): true
+                  (contains($error, 'platform-golden-path')): true
+    - name: image-signed-by-a-different-identity-is-rejected
+      try:
+        - apply:
+            file: wrong-identity-pod.yaml
+            expect:
+              - check:
+                  ($error != null): true
+                  (contains($error, 'platform-golden-path')): true

@@ -1,0 +1,88 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-image-signature
+  annotations:
+    policies.kyverno.io/title: Verify Image Signature (Golden Path)
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: critical
+    policies.kyverno.io/subject: Pod, Image
+    policies.kyverno.io/description: >-
+      ADR-0005 keystone. Admits an image only if it is signed keyless by the
+      golden-path reusable workflow's GitHub OIDC identity. The line between
+      "our reviewed pipeline built this" and "someone pushed this".
+spec:
+  # verifyImages reaches out to Rekor/Fulcio; give the webhook room and fail
+  # closed — if we cannot prove provenance, the workload does not run.
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  background: false
+  rules:
+    # Rule 1 verifies the signature and records the result in the
+    # kyverno.io/verify-images annotation ("pass"/"fail" per image). It runs in
+    # Audit so it does NOT block here — that lets rule 2 turn a failure into an
+    # actionable denial. (Kyverno forbids a custom message on a blocking
+    # verifyImages rule, and forbids mutateDigest on an Audit rule; the digest
+    # trade-off is documented in this folder's README.)
+    - name: verify-golden-path-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              # App tier only. Platform images (argocd, kyverno) are not built by
+              # the golden path, so this policy must never see them.
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      verifyImages:
+        - imageReferences:
+            - "*"
+          failureAction: Audit
+          required: true
+          mutateDigest: false
+          verifyDigest: false
+          attestors:
+            - count: 1
+              entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    # Pinned EXACTLY to the golden-path reusable workflow on main.
+                    # Do NOT broaden this regex without an ADR-0005 amendment
+                    # (CLAUDE.md, ADR-0005 consequences).
+                    subjectRegExp: ^https://github\.com/<ORG>/platform-golden-path/\.github/workflows/golden-path\.yml@refs/heads/main$
+                    rekor:
+                      url: https://rekor.sigstore.dev
+                    ctlog:
+                      ignoreSCT: true
+    # Rule 2 is the actionable block. Any image rule 1 could not verify is marked
+    # "fail" in the annotation; this Enforce rule denies it with product copy.
+    - name: require-golden-path-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      validate:
+        failureAction: Enforce
+        message: >-
+          This image is not signed by the golden path, so the cluster can't prove
+          it came from a reviewed, policy-gated build — and it will not run code of
+          unknown provenance. Every image must be built and pushed by the
+          golden-path pipeline, which signs it keyless with the workflow's GitHub
+          OIDC identity (issuer token.actions.githubusercontent.com, subject
+          <ORG>/platform-golden-path/.github/workflows/golden-path.yml@refs/heads/main).
+          Ship it through the paved road:
+          https://github.com/<ORG>/platform-golden-path#quickstart
+        deny:
+          conditions:
+            any:
+              # "fail" appears if any image failed verification in rule 1. The
+              # annotation is shared across supply-chain policies and is "fail"
+              # if ANY of them failed the image, so this is fail-closed.
+              - key: fail
+                operator: AnyIn
+                value: '{{ (request.object.metadata.annotations."kyverno.io/verify-images" || ''{}'') | parse_json(@) | values(@) }}'

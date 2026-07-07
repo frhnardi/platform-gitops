@@ -1,0 +1,62 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-run-as-nonroot
+  annotations:
+    policies.kyverno.io/title: Require runAsNonRoot
+    policies.kyverno.io/category: Pod Security Baseline
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Requires runAsNonRoot: true at the pod or container level so containers
+      cannot run as UID 0.
+spec:
+  background: true
+  rules:
+    - name: run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaceSelector:
+              matchLabels:
+                paved-road.platform/tier: app
+        message: >-
+          Container may run as root: runAsNonRoot: true is not set at the pod or
+          container level. A process running as UID 0 inside the container is UID 0
+          on the host if it ever escapes the sandbox, so root-in-container removes
+          the last safety margin behind any container breakout. Set
+          spec.securityContext.runAsNonRoot: true for the whole pod (add
+          runAsUser: 65532 if the image defaults to root), or set it on every
+          container's securityContext. Guide:
+          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#run-as-non-root
+        anyPattern:
+          # Either the pod sets it once for all containers...
+          - spec:
+              securityContext:
+                runAsNonRoot: "true"
+              =(ephemeralContainers):
+                - =(securityContext):
+                    =(runAsNonRoot): "true"
+              =(initContainers):
+                - =(securityContext):
+                    =(runAsNonRoot): "true"
+              containers:
+                - =(securityContext):
+                    =(runAsNonRoot): "true"
+          # ...or every container sets it explicitly.
+          - spec:
+              =(ephemeralContainers):
+                - securityContext:
+                    runAsNonRoot: "true"
+              =(initContainers):
+                - securityContext:
+                    runAsNonRoot: "true"
+              containers:
+                - securityContext:
+                    runAsNonRoot: "true"

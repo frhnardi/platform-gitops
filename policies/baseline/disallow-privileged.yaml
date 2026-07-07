@@ -1,0 +1,50 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged
+  annotations:
+    policies.kyverno.io/title: Disallow Privileged Containers
+    policies.kyverno.io/category: Pod Security Baseline
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Privileged containers switch off container isolation and get near-root
+      access to the node. Rejects any container that requests privileged mode.
+spec:
+  # Background scanning also reports pre-existing violations in Audit namespaces.
+  background: true
+  rules:
+    - name: privileged-containers
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        # Audit cluster-wide; Enforce (block) only in app-tier namespaces.
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaceSelector:
+              matchLabels:
+                paved-road.platform/tier: app
+        message: >-
+          Privileged containers are not allowed: a container in this Pod sets
+          securityContext.privileged: true. Privileged mode disables container
+          isolation — it hands the container every Linux capability plus raw host
+          device access, so one compromised process becomes a compromised node.
+          Remove the field (or set securityContext.privileged: false) and, if you
+          genuinely need a kernel privilege, add back only that one capability
+          under securityContext.capabilities.add. Guide:
+          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#disallow-privileged-containers
+        pattern:
+          spec:
+            =(ephemeralContainers):
+              - =(securityContext):
+                  =(privileged): "false"
+            =(initContainers):
+              - =(securityContext):
+                  =(privileged): "false"
+            containers:
+              - =(securityContext):
+                  =(privileged): "false"

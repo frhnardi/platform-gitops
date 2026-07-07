@@ -1,0 +1,75 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-sbom-attestation
+  annotations:
+    policies.kyverno.io/title: Verify SBOM Attestation (Golden Path)
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod, Image
+    policies.kyverno.io/description: >-
+      Requires an SPDX SBOM attestation signed keyless by the golden-path
+      workflow identity — the same identity that signs the image. A signature
+      proves who built it; the SBOM attestation proves what is inside it.
+spec:
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  background: false
+  rules:
+    # Rule 1: verify the SPDX SBOM attestation (Audit -> records pass/fail in the
+    # shared kyverno.io/verify-images annotation, does not block here).
+    - name: verify-golden-path-sbom
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      verifyImages:
+        - imageReferences:
+            - "*"
+          failureAction: Audit
+          required: true
+          mutateDigest: false
+          verifyDigest: false
+          attestations:
+            # in-toto predicate type emitted by `cosign attest --type spdx`.
+            - type: https://spdx.dev/Document
+              attestors:
+                - count: 1
+                  entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: ^https://github\.com/<ORG>/platform-golden-path/\.github/workflows/golden-path\.yml@refs/heads/main$
+                        rekor:
+                          url: https://rekor.sigstore.dev
+                        ctlog:
+                          ignoreSCT: true
+    # Rule 2: the actionable block for a missing/invalid SBOM attestation.
+    - name: require-golden-path-sbom
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      validate:
+        failureAction: Enforce
+        message: >-
+          This image has no SPDX SBOM attestation signed by the golden path, so
+          the cluster can't see what's inside it — no bill of materials means no
+          way to answer "are we affected?" when the next CVE lands. The
+          golden-path pipeline generates an SPDX SBOM with Syft and attaches it as
+          a keyless-signed attestation (cosign attest --type spdx). Ship it through
+          the paved road:
+          https://github.com/<ORG>/platform-golden-path#quickstart
+        deny:
+          conditions:
+            any:
+              - key: fail
+                operator: AnyIn
+                value: '{{ (request.object.metadata.annotations."kyverno.io/verify-images" || ''{}'') | parse_json(@) | values(@) }}'

@@ -1,0 +1,27 @@
+# Broken field: runAsNonRoot is absent at both pod and container level, so the
+# container is free to run as UID 0.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: violating
+spec:
+  securityContext:
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+      securityContext:
+        privileged: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        limits:
+          cpu: 50m
+          memory: 64Mi
+        requests:
+          cpu: 10m
+          memory: 32Mi

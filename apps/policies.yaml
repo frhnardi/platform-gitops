@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # Kyverno policies (baseline now, supply-chain in 3.3). Managed by the
+  # app-of-apps root. Sync-wave 1 so it reconciles after the kyverno app
+  # (wave 0) has installed the Kyverno CRDs these ClusterPolicies depend on.
+  name: policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Replace <ORG> with your GitHub org (see docs/bootstrap.md).
+    repoURL: https://github.com/<ORG>/platform-gitops.git
+    targetRevision: main
+    path: policies
+  destination:
+    server: https://kubernetes.default.svc
+    # ClusterPolicies are cluster-scoped; this namespace is only ArgoCD's
+    # bookkeeping default for any namespaced resource.
+    namespace: kyverno
+  syncPolicy:
+    # Platform app policy (CLAUDE.md): automated with prune + selfHeal.
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # ClusterPolicy CRDs may not exist on the very first sync; retry cleanly.
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,50 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: drop-all-capabilities
+  annotations:
+    policies.kyverno.io/title: Drop All Capabilities
+    policies.kyverno.io/category: Pod Security Baseline
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Requires every container to drop ALL Linux capabilities. Capabilities are
+      then re-added one at a time, explicitly, only where justified.
+spec:
+  background: true
+  rules:
+    - name: require-drop-all
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        all:
+          - key: "{{ request.operation || 'BACKGROUND' }}"
+            operator: NotEquals
+            value: DELETE
+      validate:
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaceSelector:
+              matchLabels:
+                paved-road.platform/tier: app
+        message: >-
+          Container does not drop ALL capabilities: securityContext.capabilities.drop
+          must contain "ALL". Containers start with a set of Linux capabilities
+          (NET_RAW, CHOWN, SETUID and more) that an attacker can use to sniff
+          traffic, forge packets, or bypass file permissions after a compromise.
+          Drop everything and add back only what you need:
+          securityContext.capabilities.drop: ["ALL"] (then, if required,
+          capabilities.add: ["NET_BIND_SERVICE"]). Guide:
+          https://github.com/<ORG>/platform-gitops/blob/main/policies/baseline/README.md#drop-all-capabilities
+        foreach:
+          - list: request.object.spec.[ephemeralContainers, initContainers, containers][]
+            deny:
+              conditions:
+                all:
+                  - key: ALL
+                    operator: AnyNotIn
+                    value: "{{ element.securityContext.capabilities.drop[] || `[]` }}"
