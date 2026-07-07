@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # The sample-service workload — the proof the paved road reaches a running
+  # pod. Picked up by the app-of-apps root (apps/*.yaml). Sync-wave 2 so it
+  # reconciles after kyverno (wave 0) and the policies (wave 1): enforcement
+  # must exist before the first workload is admitted.
+  name: sample-service
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/frhnardi/platform-gitops.git
+    targetRevision: main
+    path: apps/sample-service
+  destination:
+    server: https://kubernetes.default.svc
+    # The 'apps' namespace is bootstrapped in clusters/dev/namespaces and carries
+    # the paved-road.platform/tier: app label that flips policies to Enforce.
+    namespace: apps
+  syncPolicy:
+    # App workload policy (CLAUDE.md): sync automatically and self-heal, but
+    # prune MANUALLY — deleting a manifest should not silently delete a running
+    # service. (Platform apps use prune: true; app workloads deliberately do not.)
+    automated:
+      selfHeal: true
