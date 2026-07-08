@@ -1,0 +1,189 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deepseek-webhook-config
+  namespace: monitoring
+data:
+  config.yaml: |
+    deepseek:
+      base_url: "https://api.deepseek.com/v1"
+      model: "deepseek-chat"
+      max_tokens: 1024
+    prometheus:
+      url: "http://prometheus.monitoring:9090"
+    loki:
+      url: "http://loki.monitoring:3100"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: deepseek-api-key
+  namespace: monitoring
+type: Opaque
+stringData:
+  DEEPSEEK_API_KEY: "placeholder-set-your-key"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepseek-webhook
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deepseek-webhook
+  template:
+    metadata:
+      labels:
+        app: deepseek-webhook
+    spec:
+      tolerations:
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+      containers:
+        - name: webhook
+          image: python:3.12-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install --no-cache-dir fastapi uvicorn httpx && \
+              python -c "
+              from fastapi import FastAPI, Request
+              from fastapi.responses import JSONResponse
+              import httpx
+              import json
+              import os
+              import datetime
+
+              app = FastAPI(title='DeepSeek Alert RCA')
+
+              DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
+              DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
+              MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
+
+              @app.get('/healthz')
+              async def health():
+                  return {'status': 'ok'}
+
+              @app.post('/webhook')
+              async def webhook(request: Request):
+                  body = await request.json()
+                  alerts = body.get('alerts', [])
+                  title = body.get('title', 'No title')
+                  
+                  if not alerts:
+                      return JSONResponse({'status': 'no alerts'})
+                  
+                  # Build analysis prompt
+                  alert_summaries = []
+                  for a in alerts[:5]:  # limit to 5 alerts
+                      labels = a.get('labels', {})
+                      annotations = a.get('annotations', {})
+                      alert_summaries.append(
+                          f\"Alert: {annotations.get('summary', labels.get('alertname', 'unknown'))}\\n\"
+                          f\"  Severity: {labels.get('severity', 'unknown')}\\n\"
+                          f\"  Namespace: {labels.get('namespace', 'N/A')}\\n\"
+                          f\"  Description: {annotations.get('description', 'N/A')[:500]}\"
+                      )
+                  
+                  prompt = f'''You are a Site Reliability Engineer analyzing Kubernetes monitoring alerts. 
+              Provide root cause analysis and actionable remediation steps for these alerts:
+
+              {chr(10).join(alert_summaries)}
+
+              Format your response as:
+              1. **Root Cause Analysis**: What likely caused these alerts
+              2. **Impact Assessment**: What's affected
+              3. **Remediation Steps**: Specific kubectl/helm commands to fix
+              4. **Prevention**: How to prevent recurrence
+              '''
+                  
+                  analysis = 'DeepSeek API not configured. Set DEEPSEEK_API_KEY secret.'
+                  
+                  if DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != 'placeholder-set-your-key':
+                      try:
+                          async with httpx.AsyncClient(timeout=30.0) as client:
+                              resp = await client.post(
+                                  f'{DEEPSEEK_BASE_URL}/chat/completions',
+                                  headers={
+                                      'Authorization': f'Bearer {DEEPSEEK_API_KEY}',
+                                      'Content-Type': 'application/json'
+                                  },
+                                  json={
+                                      'model': MODEL,
+                                      'messages': [
+                                          {'role': 'system', 'content': 'You are an expert SRE and Kubernetes operator.'},
+                                          {'role': 'user', 'content': prompt}
+                                      ],
+                                      'max_tokens': 1024,
+                                      'temperature': 0.3
+                                  }
+                              )
+                              if resp.status_code == 200:
+                                  result = resp.json()
+                                  analysis = result['choices'][0]['message']['content']
+                              else:
+                                  analysis = f'DeepSeek API error: {resp.status_code} - {resp.text[:200]}'
+                      except Exception as e:
+                          analysis = f'Error calling DeepSeek API: {str(e)}'
+                  
+                  timestamp = datetime.datetime.utcnow().isoformat()
+                  log_entry = {
+                      'timestamp': timestamp,
+                      'title': title,
+                      'alert_count': len(alerts),
+                      'analysis': analysis[:2000]
+                  }
+                  
+                  # Log analysis to stdout (will be collected by Promtail/Loki)
+                  print(json.dumps(log_entry))
+                  
+                  return JSONResponse({
+                      'status': 'analyzed',
+                      'timestamp': timestamp,
+                      'analysis': analysis[:2000]
+                  })
+
+              if __name__ == '__main__':
+                  import uvicorn
+                  uvicorn.run(app, host='0.0.0.0', port=8080)
+              "
+          env:
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: deepseek-api-key
+                  key: DEEPSEEK_API_KEY
+            - name: DEEPSEEK_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: deepseek-webhook-config
+                  key: config.yaml
+                  optional: true
+          ports:
+            - containerPort: 8080
+          resources:
+            limits: {cpu: 200m, memory: 256Mi}
+            requests: {cpu: 50m, memory: 128Mi}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepseek-webhook
+  namespace: monitoring
+spec:
+  selector:
+    app: deepseek-webhook
+  ports:
+    - port: 8080
+      targetPort: 8080

@@ -5,6 +5,7 @@ resources:
   - grafana.yaml
   - prometheus.yaml
   - loki.yaml
+  - deepseek-webhook.yaml
   - ingress.yaml
 configMapGenerator:
   - name: grafana-dashboards
