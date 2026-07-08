@@ -2,10 +2,14 @@
   "title": "Developer Overview",
   "uid": "developer-overview",
   "panels": [
-    {"title":"Deployments by Namespace","type":"table","gridPos":{"x":0,"y":0,"w":12,"h":8},"targets":[{"expr":"kube_deployment_status_condition{condition=\"Available\",status=\"true\"}","refId":"A","format":"table","instant":true}]},
-    {"title":"Pod Health","type":"bargauge","gridPos":{"x":12,"y":0,"w":12,"h":8},"targets":[{"expr":"count(kube_pod_status_phase{phase=\"Running\"}) by (namespace)","refId":"A","legendFormat":"Running"},{"expr":"count(kube_pod_status_phase{phase!=\"Running\",phase!=\"Succeeded\"}) by (namespace)","refId":"B","legendFormat":"Not Running"}]},
-    {"title":"Container Restarts (1h)","type":"stat","gridPos":{"x":0,"y":8,"w":6,"h":4},"targets":[{"expr":"sum(increase(kube_pod_container_status_restarts_total[1h]))","refId":"A"}],"fieldConfig":{"defaults":{"thresholds":{"steps":[{"color":"green","value":0},{"color":"yellow","value":1},{"color":"red","value":5}]}}}},
-    {"title":"Pods Pending/Failed","type":"stat","gridPos":{"x":6,"y":8,"w":6,"h":4},"targets":[{"expr":"count(kube_pod_status_phase{phase=~\"Pending|Failed|Unknown\"})","refId":"A"}],"fieldConfig":{"defaults":{"thresholds":{"steps":[{"color":"green","value":0},{"color":"red","value":1}]}}}}
+    {"title":"Deployments (Available)","type":"table","gridPos":{"x":0,"y":0,"w":8,"h":6},"targets":[{"expr":"kube_deployment_status_condition{condition=\"Available\",status=\"true\"}","refId":"A","format":"table","instant":true}]},
+    {"title":"Deployments (Unavailable)","type":"table","gridPos":{"x":8,"y":0,"w":8,"h":6},"targets":[{"expr":"kube_deployment_status_condition{condition=\"Available\",status=\"false\"}","refId":"A","format":"table","instant":true}]},
+    {"title":"Pods Running vs Not Running","type":"bargauge","gridPos":{"x":16,"y":0,"w":8,"h":6},"targets":[{"expr":"count(kube_pod_status_phase{phase=\"Running\"}) by (namespace)","refId":"A","legendFormat":"{{namespace}} Running"},{"expr":"count(kube_pod_status_phase{phase!=\"Running\",phase!=\"Succeeded\"}) by (namespace)","refId":"B","legendFormat":"{{namespace}} NotRunning"}]},
+    {"title":"Container Restarts (last 1h, per namespace)","type":"stat","gridPos":{"x":0,"y":6,"w":6,"h":3},"targets":[{"expr":"sum(increase(kube_pod_container_status_restarts_total[1h]))","refId":"A"}]},
+    {"title":"Pods Pending/Failed/Unknown","type":"stat","gridPos":{"x":6,"y":6,"w":6,"h":3},"targets":[{"expr":"count(kube_pod_status_phase{phase=~\"Pending|Failed|Unknown\"})","refId":"A"}]},
+    {"title":"Replica Status","type":"table","gridPos":{"x":12,"y":6,"w":12,"h":3},"targets":[{"expr":"kube_deployment_spec_replicas","refId":"A","format":"table","instant":true}]},
+    {"title":"Memory per Pod (MB, top 10)","type":"timeseries","gridPos":{"x":0,"y":9,"w":12,"h":6},"targets":[{"expr":"topk(10,sum(container_memory_working_set_bytes{namespace!=\"\",container!=\"\"}) by (pod) / 1024 / 1024)","refId":"A","legendFormat":"{{pod}}"}]},
+    {"title":"CPU per Pod (top 10)","type":"timeseries","gridPos":{"x":12,"y":9,"w":12,"h":6},"targets":[{"expr":"topk(10,sum(rate(container_cpu_usage_seconds_total{namespace!=\"\",container!=\"\"}[5m])) by (pod))","refId":"A","legendFormat":"{{pod}}"}]}
   ],
   "schemaVersion": 39,
   "tags": ["developer","paved-road"],
