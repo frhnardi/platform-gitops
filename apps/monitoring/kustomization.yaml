@@ -10,6 +10,7 @@ configMapGenerator:
     namespace: monitoring
     files:
       - dashboards/platform-engineering.json
+      - dashboards/dashboards.yaml
       - dashboards/developer-overview.json
 generatorOptions:
   disableNameSuffixHash: true
