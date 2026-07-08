@@ -11,3 +11,5 @@ configMapGenerator:
     files:
       - dashboards/platform-engineering.json
       - dashboards/developer-overview.json
+generatorOptions:
+  disableNameSuffixHash: true
