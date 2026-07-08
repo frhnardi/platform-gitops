@@ -190,6 +190,9 @@ spec:
           operator: Equal
           value: spot
           effect: NoSchedule
+        - key: CriticalAddonsOnly
+          operator: Exists
+          effect: NoSchedule
         - operator: Exists
           effect: NoSchedule
         - operator: Exists
