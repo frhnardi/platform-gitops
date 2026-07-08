@@ -13,21 +13,6 @@ data:
         access: proxy
         isDefault: true
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-dashboard-provisioning
-  namespace: monitoring
-data:
-  dashboards.yaml: |
-    apiVersion: 1
-    providers:
-      - name: default
-        folder: ""
-        type: file
-        options:
-          path: /etc/grafana/provisioning/dashboards/json
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -43,6 +28,9 @@ spec:
       labels:
         app: grafana
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
       tolerations:
         - key: kubernetes.azure.com/scalesetpriority
           operator: Equal
@@ -56,26 +44,37 @@ spec:
               value: admin123
           ports:
             - containerPort: 3000
+          securityContext:
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           resources:
             limits: {cpu: 300m, memory: 256Mi}
             requests: {cpu: 100m, memory: 128Mi}
           volumeMounts:
             - name: datasources
               mountPath: /etc/grafana/provisioning/datasources
-            - name: dashboard-provisioning
-              mountPath: /etc/grafana/provisioning/dashboards/json
             - name: dashboards
-              mountPath: /etc/grafana/provisioning/dashboards/json
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+            - name: grafana-log
+              mountPath: /var/log/grafana
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: datasources
           configMap:
             name: grafana-datasources
-        - name: dashboard-provisioning
-          configMap:
-            name: grafana-dashboard-provisioning
         - name: dashboards
           configMap:
             name: grafana-dashboards
+        - name: grafana-storage
+          emptyDir: {}
+        - name: grafana-log
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
