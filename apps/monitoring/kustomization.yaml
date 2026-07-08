@@ -4,6 +4,7 @@ namespace: monitoring
 resources:
   - grafana.yaml
   - prometheus.yaml
+  - loki.yaml
   - ingress.yaml
 configMapGenerator:
   - name: grafana-dashboards

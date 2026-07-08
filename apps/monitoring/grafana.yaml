@@ -12,6 +12,10 @@ data:
         url: http://prometheus.monitoring:9090
         access: proxy
         isDefault: true
+      - name: Loki
+        type: loki
+        url: http://loki.monitoring:3100
+        access: proxy
 ---
 apiVersion: apps/v1
 kind: Deployment
