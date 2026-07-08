@@ -12,6 +12,7 @@ data:
         url: http://prometheus.monitoring:9090
         access: proxy
         isDefault: true
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -25,7 +26,57 @@ data:
         folder: ""
         type: file
         options:
-          path: /etc/grafana/provisioning/dashboards
+          path: /etc/grafana/provisioning/dashboards/json
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      tolerations:
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.6.0
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: admin123
+          ports:
+            - containerPort: 3000
+          resources:
+            limits: {cpu: 300m, memory: 256Mi}
+            requests: {cpu: 100m, memory: 128Mi}
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provisioning
+              mountPath: /etc/grafana/provisioning/dashboards/json
+            - name: dashboards
+              mountPath: /etc/grafana/provisioning/dashboards/json
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboard-provisioning
+          configMap:
+            name: grafana-dashboard-provisioning
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+---
 apiVersion: v1
 kind: Service
 metadata:
