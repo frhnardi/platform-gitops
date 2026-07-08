@@ -1,35 +1,31 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: grafana
+  name: grafana-datasources
   namespace: monitoring
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: grafana
-  template:
-    metadata:
-      labels:
-        app: grafana
-    spec:
-      tolerations:
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
-          effect: NoSchedule
-      containers:
-        - name: grafana
-          image: grafana/grafana:11.6.0
-          env:
-            - name: GF_SECURITY_ADMIN_PASSWORD
-              value: admin123
-          ports:
-            - containerPort: 3000
-          resources:
-            limits: {cpu: 300m, memory: 256Mi}
-            requests: {cpu: 100m, memory: 128Mi}
----
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus.monitoring:9090
+        access: proxy
+        isDefault: true
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provisioning
+  namespace: monitoring
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        folder: ""
+        type: file
+        options:
+          path: /etc/grafana/provisioning/dashboards
 apiVersion: v1
 kind: Service
 metadata:

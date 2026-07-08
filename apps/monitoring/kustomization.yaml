@@ -5,4 +5,9 @@ resources:
   - grafana.yaml
   - prometheus.yaml
   - ingress.yaml
-  - certificate.yaml
+configMapGenerator:
+  - name: grafana-dashboards
+    namespace: monitoring
+    files:
+      - dashboards/platform-engineering.json
+      - dashboards/developer-overview.json
