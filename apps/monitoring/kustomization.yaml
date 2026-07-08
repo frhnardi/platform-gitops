@@ -5,3 +5,4 @@ resources:
   - grafana.yaml
   - prometheus.yaml
   - ingress.yaml
+  - certificate.yaml
