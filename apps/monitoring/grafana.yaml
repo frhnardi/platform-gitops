@@ -19,6 +19,35 @@ data:
         url: http://loki.monitoring:3100
         access: proxy
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerting
+  namespace: monitoring
+data:
+  contact-points.yaml: |
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: deepseek-webhook
+        receivers:
+          - uid: deepseek
+            type: webhook
+            settings:
+              url: http://deepseek-webhook.monitoring:8080/webhook
+              httpMethod: POST
+            disableResolveMessage: false
+  notification-policies.yaml: |
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: deepseek-webhook
+        group_by:
+          - alertname
+        group_wait: 30s
+        group_interval: 2m
+        repeat_interval: 4h
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -62,6 +91,8 @@ spec:
               mountPath: /etc/grafana/provisioning/datasources
             - name: dashboards
               mountPath: /etc/grafana/provisioning/dashboards
+            - name: alerting
+              mountPath: /etc/grafana/provisioning/alerting
             - name: grafana-storage
               mountPath: /var/lib/grafana
             - name: grafana-log
@@ -75,6 +106,9 @@ spec:
         - name: dashboards
           configMap:
             name: grafana-dashboards
+        - name: alerting
+          configMap:
+            name: grafana-alerting
         - name: grafana-storage
           emptyDir: {}
         - name: grafana-log
