@@ -40,7 +40,6 @@ data:
       reject_old_samples_max_age: 168h
     compactor:
       working_directory: /loki/compactor
-      shared_store: filesystem
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -179,6 +178,9 @@ spec:
         app: promtail
     spec:
       serviceAccountName: promtail
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
       tolerations:
         - key: kubernetes.azure.com/scalesetpriority
           operator: Equal
@@ -195,9 +197,13 @@ spec:
             - -config.file=/etc/promtail/promtail.yaml
           ports:
             - containerPort: 9080
+          securityContext:
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           resources:
             limits: {cpu: 200m, memory: 128Mi}
-            requests: {cpu: 50m, memory: 64Mi}
+            requests: {cpu: 25m, memory: 48Mi}
           volumeMounts:
             - name: config
               mountPath: /etc/promtail
@@ -207,6 +213,8 @@ spec:
             - name: pods
               mountPath: /var/log/pods
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: config
           configMap:
@@ -217,6 +225,8 @@ spec:
         - name: pods
           hostPath:
             path: /var/log/pods
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
