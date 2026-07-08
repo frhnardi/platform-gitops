@@ -1,17 +1,660 @@
 {
   "title": "Developer Overview",
   "uid": "developer-overview",
-  "panels": [
-    {"title":"Deployments (Available)","type":"table","gridPos":{"x":0,"y":0,"w":8,"h":6},"targets":[{"expr":"kube_deployment_status_condition{condition=\"Available\",status=\"true\"}","refId":"A","format":"table","instant":true}]},
-    {"title":"Deployments (Unavailable)","type":"table","gridPos":{"x":8,"y":0,"w":8,"h":6},"targets":[{"expr":"kube_deployment_status_condition{condition=\"Available\",status=\"false\"}","refId":"A","format":"table","instant":true}]},
-    {"title":"Pods Running vs Not Running","type":"bargauge","gridPos":{"x":16,"y":0,"w":8,"h":6},"targets":[{"expr":"count(kube_pod_status_phase{phase=\"Running\"}) by (namespace)","refId":"A","legendFormat":"{{namespace}} Running"},{"expr":"count(kube_pod_status_phase{phase!=\"Running\",phase!=\"Succeeded\"}) by (namespace)","refId":"B","legendFormat":"{{namespace}} NotRunning"}]},
-    {"title":"Container Restarts (last 1h, per namespace)","type":"stat","gridPos":{"x":0,"y":6,"w":6,"h":3},"targets":[{"expr":"sum(increase(kube_pod_container_status_restarts_total[1h]))","refId":"A"}]},
-    {"title":"Pods Pending/Failed/Unknown","type":"stat","gridPos":{"x":6,"y":6,"w":6,"h":3},"targets":[{"expr":"count(kube_pod_status_phase{phase=~\"Pending|Failed|Unknown\"})","refId":"A"}]},
-    {"title":"Replica Status","type":"table","gridPos":{"x":12,"y":6,"w":12,"h":3},"targets":[{"expr":"kube_deployment_spec_replicas","refId":"A","format":"table","instant":true}]},
-    {"title":"Memory per Pod (MB, top 10)","type":"timeseries","gridPos":{"x":0,"y":9,"w":12,"h":6},"targets":[{"expr":"topk(10,sum(container_memory_working_set_bytes{namespace!=\"\",container!=\"\"}) by (pod) / 1024 / 1024)","refId":"A","legendFormat":"{{pod}}"}]},
-    {"title":"CPU per Pod (top 10)","type":"timeseries","gridPos":{"x":12,"y":9,"w":12,"h":6},"targets":[{"expr":"topk(10,sum(rate(container_cpu_usage_seconds_total{namespace!=\"\",container!=\"\"}[5m])) by (pod))","refId":"A","legendFormat":"{{pod}}"}]}
+  "tags": [
+    "apps",
+    "developers"
   ],
-  "schemaVersion": 39,
-  "tags": ["developer","paved-road"],
-  "timezone": "browser"
+  "refresh": "30s",
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Deployments Ready",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "sum(kube_deployment_status_replicas_available)",
+          "legendFormat": "Ready",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Running Pods",
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "count(kube_pod_status_phase{phase=\"Running\"})",
+          "legendFormat": "Running",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed Pods",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "count(kube_pod_status_phase{phase=~\"Failed|Unknown\"})",
+          "legendFormat": "Failed",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "CPU Cores (Cluster)",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "sum(machine_cpu_cores)",
+          "legendFormat": "Cores",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Namespaces",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "count(kube_namespace_created)",
+          "legendFormat": "NS",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Services",
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "count(kube_service_info)",
+          "legendFormat": "Svcs",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Deployment Health",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "kube_deployment_status_replicas_available / kube_deployment_spec_replicas",
+          "legendFormat": "{{namespace}}/{{deployment}}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "custom": {
+            "minWidth": 120,
+            "cellOptions": {
+              "type": "color-background"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "piechart",
+      "title": "Pod Status Breakdown",
+      "gridPos": {
+        "x": 12,
+        "y": 3,
+        "w": 6,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "count by (phase) (kube_pod_status_phase{phase=~\"Running|Pending|Failed|Succeeded|Unknown\"})",
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "bargauge",
+      "title": "Pods per Namespace",
+      "gridPos": {
+        "x": 18,
+        "y": 3,
+        "w": 6,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "count by (namespace) (kube_pod_info)",
+          "legendFormat": "{{namespace}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "stat",
+      "title": "Container Restarts (1h)",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(kube_pod_container_status_restarts_total[1h]))",
+          "legendFormat": "Restarts",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "stat",
+      "title": "CrashLoopBackOff",
+      "gridPos": {
+        "x": 4,
+        "y": 10,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "count(kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\"})",
+          "legendFormat": "CrashLoop",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "Pending Pods",
+      "gridPos": {
+        "x": 8,
+        "y": 10,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "count(kube_pod_status_phase{phase=\"Pending\"})",
+          "legendFormat": "Pending",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "ImagePullBackOff",
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "count(kube_pod_container_status_waiting_reason{reason=\"ImagePullBackOff\"})",
+          "legendFormat": "PullErr",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "stat",
+      "title": "OOMKilled (1h)",
+      "gridPos": {
+        "x": 16,
+        "y": 10,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(kube_pod_container_status_terminated_reason{reason=\"OOMKilled\"}[1h]))",
+          "legendFormat": "OOM",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 25,
+      "type": "stat",
+      "title": "Available Nodes",
+      "gridPos": {
+        "x": 20,
+        "y": 10,
+        "w": 4,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})",
+          "legendFormat": "Ready",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "CPU per Pod (top 10)",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (pod, namespace) (rate(container_cpu_usage_seconds_total{container!=\"\",pod!=\"\"}[5m])))",
+          "legendFormat": "{{namespace}}/{{pod}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cores",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2
+          }
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Memory per Pod (top 10, MB)",
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (pod, namespace) (container_memory_working_set_bytes{container!=\"\",pod!=\"\"}) / 1048576)",
+          "legendFormat": "{{namespace}}/{{pod}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbytes",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2
+          }
+        }
+      }
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "Container Restarts Trend (10min)",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(kube_pod_container_status_restarts_total[10m])) by (namespace, pod)",
+          "legendFormat": "{{namespace}}/{{pod}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "timepicker": {
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m"
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  }
 }
