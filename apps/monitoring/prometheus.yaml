@@ -11,6 +11,16 @@ data:
       - job_name: kube-state-metrics
         static_configs:
           - targets: ['kube-state-metrics.monitoring:8080']
+      - job_name: kyverno
+        static_configs:
+          - targets:
+            - kyverno-svc-metrics.kyverno:8000
+            - kyverno-background-controller-metrics.kyverno:8000
+            - kyverno-reports-controller-metrics.kyverno:8000
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: kyverno_.*
+            action: keep
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -78,6 +88,7 @@ spec:
       labels:
         app: kube-state-metrics
     spec:
+      serviceAccountName: kube-state-metrics
       tolerations:
         - key: kubernetes.azure.com/scalesetpriority
           operator: Equal
@@ -91,6 +102,64 @@ spec:
           resources:
             limits: {cpu: 200m, memory: 128Mi}
             requests: {cpu: 50m, memory: 64Mi}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-state-metrics
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - pods
+      - services
+      - resourcequotas
+      - replicationcontrollers
+      - limitranges
+      - persistentvolumeclaims
+      - persistentvolumes
+      - namespaces
+      - endpoints
+      - configmaps
+      - secrets
+    verbs: ["list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
+    verbs: ["list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies", "ingresses"]
+    verbs: ["list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "volumeattachments"]
+    verbs: ["list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-state-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-state-metrics
+subjects:
+  - kind: ServiceAccount
+    name: kube-state-metrics
+    namespace: monitoring
 ---
 apiVersion: v1
 kind: Service
