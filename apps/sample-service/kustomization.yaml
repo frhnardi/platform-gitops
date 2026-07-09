@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Deploy into the app tier: baseline + supply-chain policies run in Enforce here.
+namespace: apps
+resources:
+  - deployment.yaml
+  - service.yaml
+# The golden-path promotion PR rewrites this entry on every build: it sets
+# `newName` + `digest` and deletes `newTag`, so the workload is only ever pinned
+# by an immutable, signed digest. Until the first promotion merges, the tag
+# below is a placeholder that resolves to no real image on purpose — the pod
+# stays un-admitted (Kyverno can't verify an unsigned/absent image) rather than
+# running something unproven.
+images:
+  - name: sample-service
+    newName: prpacrdev.azurecr.io/sample-service
+    digest: sha256:5df7f722313d60ac585c90cf0e9110c2bd6d7fa42cd9f14b03be7970e2240526
