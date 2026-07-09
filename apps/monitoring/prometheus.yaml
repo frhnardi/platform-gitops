@@ -90,9 +90,8 @@ spec:
     spec:
       serviceAccountName: prometheus
       tolerations:
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
+        - key: CriticalAddonsOnly
+          operator: Exists
           effect: NoSchedule
       containers:
         - name: prometheus
@@ -142,9 +141,8 @@ spec:
     spec:
       serviceAccountName: kube-state-metrics
       tolerations:
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
+        - key: CriticalAddonsOnly
+          operator: Exists
           effect: NoSchedule
       containers:
         - name: kube-state-metrics

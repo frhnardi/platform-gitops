@@ -39,9 +39,8 @@ spec:
         app: deepseek-webhook
     spec:
       tolerations:
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
+        - key: CriticalAddonsOnly
+          operator: Exists
           effect: NoSchedule
       containers:
         - name: webhook
