@@ -61,9 +61,8 @@ spec:
         app: loki
     spec:
       tolerations:
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
+        - key: CriticalAddonsOnly
+          operator: Exists
           effect: NoSchedule
       containers:
         - name: loki
@@ -186,9 +185,8 @@ spec:
         runAsNonRoot: true
         runAsUser: 65532
       tolerations:
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
+        - key: CriticalAddonsOnly
+          operator: Exists
           effect: NoSchedule
         - key: CriticalAddonsOnly
           operator: Exists

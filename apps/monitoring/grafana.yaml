@@ -66,10 +66,10 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
+        fsGroup: 65532
       tolerations:
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
+        - key: CriticalAddonsOnly
+          operator: Exists
           effect: NoSchedule
       containers:
         - name: grafana
@@ -83,6 +83,9 @@ spec:
             capabilities:
               drop: ["ALL"]
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
           resources:
             limits: {cpu: 300m, memory: 256Mi}
             requests: {cpu: 100m, memory: 128Mi}
