@@ -24,7 +24,7 @@ OS       := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 ARCH     := $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
 export PATH := $(LOCALBIN):$(PATH)
 
-KUSTOMIZE_PATHS := clusters/dev/namespaces clusters/dev/argocd policies policies/baseline policies/supply-chain exceptions apps/sample-service
+KUSTOMIZE_PATHS := clusters/dev/namespaces clusters/dev/argocd policies policies/baseline policies/supply-chain exceptions
 
 .DEFAULT_GOAL := help
 .PHONY: help tools kind-up kind-down kyverno-install test-policies test-exceptions build clean
