@@ -11,9 +11,12 @@ configMapGenerator:
   - name: grafana-dashboards
     namespace: monitoring
     files:
+      - dashboards/dashboards.yaml
+      - dashboards/platform-narrative.json
       - dashboards/platform-engineering.json
       - dashboards/developer-overview.json
       - dashboards/security.json
-      - dashboards/dashboards.yaml
+      - dashboards/security-posture.json
+      - dashboards/cost-efficiency.json
 generatorOptions:
   disableNameSuffixHash: true
