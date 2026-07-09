@@ -68,13 +68,18 @@ spec:
           operator: Equal
           value: spot
           effect: NoSchedule
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
-          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
       containers:
         - name: loki
           image: grafana/loki:3.4.2
+          securityContext:
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           args:
             - -config.file=/etc/loki/loki.yaml
           ports:
@@ -195,21 +200,6 @@ spec:
       tolerations:
         - key: CriticalAddonsOnly
           operator: Exists
-          effect: NoSchedule
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
-          effect: NoSchedule
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
-          effect: NoSchedule
-        - key: CriticalAddonsOnly
-          operator: Exists
-          effect: NoSchedule
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
           effect: NoSchedule
         - key: kubernetes.azure.com/scalesetpriority
           operator: Equal
