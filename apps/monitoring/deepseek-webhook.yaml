@@ -42,6 +42,14 @@ spec:
         - key: CriticalAddonsOnly
           operator: Exists
           effect: NoSchedule
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
       containers:
         - name: webhook
           image: python:3.12-slim
