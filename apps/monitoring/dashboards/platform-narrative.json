@@ -1,0 +1,231 @@
+{
+  "title": "🏥 Platform Health at a Glance",
+  "uid": "platform-narrative",
+  "tags": ["platform", "ops", "narrative"],
+  "refresh": "30s",
+  "editable": true,
+  "graphTooltip": 1,
+  "timepicker": {"refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m"]},
+  "time": {"from": "now-6h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "🚦 Is Everything OK?",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1},
+      "collapsed": false
+    },
+    {
+      "id": 100,
+      "type": "gauge",
+      "title": "🏥 Platform Health Score",
+      "gridPos": {"x": 0, "y": 1, "w": 6, "h": 8},
+      "targets": [{
+        "expr": "clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.25 + sum(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.25 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.25 + (1 - (sum(increase(kube_pod_container_status_restarts_total[1h])) / (count(kube_pod_container_status_restarts_total) + 1))) * 0.15 - clamp_max(count(kube_event_created{type=\"Warning\"}) * 0.02, 10) * 0.10), 100)",
+        "refId": "A"
+      }],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": true, "showThresholdMarkers": true},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent", "min": 0, "max": 100,
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "red", "value": null},
+            {"color": "orange", "value": 60},
+            {"color": "yellow", "value": 80},
+            {"color": "green", "value": 95}
+          ]}
+        }
+      }
+    },
+    {
+      "id": 101,
+      "type": "stat",
+      "title": "📊 Trend (vs 24h ago)",
+      "gridPos": {"x": 6, "y": 1, "w": 3, "h": 4},
+      "targets": [{
+        "expr": "(clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.25 + sum(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.25 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.25), 100)) - (clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"} offset 24h) / count(kube_node_info) * 0.25 + sum(kube_pod_status_phase{phase=\"Running\"} offset 24h) / count(kube_pod_info) * 0.25 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"} offset 24h) / count(kube_deployment_created) * 0.25), 100))",
+        "refId": "A"
+      }],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent", "decimals": 1,
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "red", "value": null},
+            {"color": "yellow", "value": 0},
+            {"color": "green", "value": 0.01}
+          ]},
+          "mappings": [{"type": "range", "options": {"from": -100, "to": -0.01, "result": {"text": "↓ Degrading"}}}]
+        }
+      }
+    },
+    {
+      "id": 102,
+      "type": "stat",
+      "title": "🔔 Active Alerts",
+      "gridPos": {"x": 9, "y": 1, "w": 3, "h": 4},
+      "targets": [{
+        "expr": "count(kube_event_created{type=\"Warning\"}) - (count(kube_event_created{type=\"Warning\"} offset 5m) > 0 or vector(0))",
+        "refId": "A"
+      }],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short", "decimals": 0,
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "orange", "value": 5},
+            {"color": "red", "value": 15}
+          ]}
+        }
+      }
+    },
+    {
+      "id": 103,
+      "type": "stat",
+      "title": "⏱️ Avg Node Uptime",
+      "gridPos": {"x": 12, "y": 1, "w": 3, "h": 4},
+      "targets": [{"expr": "avg(time() - kube_node_created) / 86400", "refId": "A"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 1, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 7}, {"color": "green", "value": 30}]}, "mappings": [{"type": "suffix", "options": {"text": " days"}}]}}
+    },
+    {
+      "id": 104,
+      "type": "stat",
+      "title": "🔄 Restarts (1h) / Health",
+      "gridPos": {"x": 15, "y": 1, "w": 3, "h": 4},
+      "targets": [{"expr": "sum(increase(kube_pod_container_status_restarts_total[1h]))", "refId": "A"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 5}]}}}
+    },
+    {
+      "id": 110,
+      "type": "stat",
+      "title": "🖥️ Ready Nodes",
+      "gridPos": {"x": 0, "y": 10, "w": 2, "h": 4},
+      "targets": [{"expr": "sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}
+    },
+    {
+      "id": 111,
+      "type": "stat",
+      "title": "📦 Total Pods",
+      "gridPos": {"x": 2, "y": 10, "w": 2, "h": 4},
+      "targets": [{"expr": "count(kube_pod_info)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "blue"}}}
+    },
+    {
+      "id": 112,
+      "type": "stat",
+      "title": "✅ Pod Health Rate",
+      "gridPos": {"x": 4, "y": 10, "w": 2, "h": 4},
+      "targets": [{"expr": "clamp_max(100 * count(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info), 100)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 80}, {"color": "green", "value": 95}]}}}
+    },
+    {
+      "id": 113,
+      "type": "stat",
+      "title": "🚢 Deployments",
+      "gridPos": {"x": 6, "y": 10, "w": 2, "h": 4},
+      "targets": [{"expr": "count(kube_deployment_created)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "blue"}}}
+    },
+    {
+      "id": 114,
+      "type": "stat",
+      "title": "📋 Deploy Ready %",
+      "gridPos": {"x": 8, "y": 10, "w": 2, "h": 4},
+      "targets": [{"expr": "clamp_max(100 * sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created), 100)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 80}, {"color": "green", "value": 95}]}}}
+    },
+    {
+      "id": 115,
+      "type": "stat",
+      "title": "⚠️ Events (Warn)",
+      "gridPos": {"x": 10, "y": 10, "w": 2, "h": 4},
+      "targets": [{"expr": "count(kube_event_created{type=\"Warning\"})", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 10}, {"color": "red", "value": 30}]}}}
+    },
+    {
+      "id": 120,
+      "type": "timeseries",
+      "title": "📈 Health Score Trend (6h)",
+      "gridPos": {"x": 0, "y": 15, "w": 24, "h": 6},
+      "targets": [{
+        "expr": "clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.25 + sum(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.25 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.25 + (1 - (sum(increase(kube_pod_container_status_restarts_total[1h])) / (count(kube_pod_container_status_restarts_total) + 1))) * 0.15 - clamp_max(count(kube_event_created{type=\"Warning\"}) * 0.02, 10) * 0.10), 100)",
+        "legendFormat": "Health Score", "refId": "A"
+      }],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "custom": {"fillOpacity": 15, "lineWidth": 3, "axisPlacement": "auto"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 60}, {"color": "yellow", "value": 80}, {"color": "green", "value": 95}]}}}
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "🧩 What's Running Where?",
+      "gridPos": {"x": 0, "y": 22, "w": 24, "h": 1},
+      "collapsed": false
+    },
+    {
+      "id": 201,
+      "type": "timeseries",
+      "title": "📊 Namespace Breakdown — Pods",
+      "gridPos": {"x": 0, "y": 23, "w": 8, "h": 7},
+      "targets": [{"expr": "count by (namespace) (kube_pod_info)", "legendFormat": "{{namespace}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 20, "stacking": {"mode": "normal"}, "lineWidth": 1}}}
+    },
+    {
+      "id": 202,
+      "type": "timeseries",
+      "title": "💻 CPU Usage by Namespace (cores)",
+      "gridPos": {"x": 8, "y": 23, "w": 8, "h": 7},
+      "targets": [{"expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{container!=\"\",pod!=\"\"}[5m]))", "legendFormat": "{{namespace}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "cores", "custom": {"fillOpacity": 20, "stacking": {"mode": "normal"}, "lineWidth": 1}}}
+    },
+    {
+      "id": 203,
+      "type": "timeseries",
+      "title": "🧠 Memory by Namespace (MB)",
+      "gridPos": {"x": 16, "y": 23, "w": 8, "h": 7},
+      "targets": [{"expr": "sum by (namespace) (container_memory_working_set_bytes{container!=\"\",pod!=\"\"}) / 1048576", "legendFormat": "{{namespace}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "Mbytes", "custom": {"fillOpacity": 20, "stacking": {"mode": "normal"}, "lineWidth": 1}}}
+    },
+    {
+      "id": 300,
+      "type": "row",
+      "title": "⚠️ What Needs Attention?",
+      "gridPos": {"x": 0, "y": 31, "w": 24, "h": 1},
+      "collapsed": false
+    },
+    {
+      "id": 301,
+      "type": "timeseries",
+      "title": "🔄 Container Restarts (30m)",
+      "gridPos": {"x": 0, "y": 32, "w": 12, "h": 7},
+      "targets": [{"expr": "sum(increase(kube_pod_container_status_restarts_total[30m])) by (namespace, pod)", "legendFormat": "{{namespace}}/{{pod}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 10, "lineWidth": 2}}}
+    },
+    {
+      "id": 302,
+      "type": "timeseries",
+      "title": "🔔 Warning Events Rate",
+      "gridPos": {"x": 12, "y": 32, "w": 12, "h": 7},
+      "targets": [{"expr": "rate(kube_event_created{type=\"Warning\"}[5m])", "legendFormat": "{{namespace}}/{{involved_object_name}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"fillOpacity": 10, "lineWidth": 2}}}
+    },
+    {
+      "id": 303,
+      "type": "table",
+      "title": "📋 Pod Status Detail",
+      "gridPos": {"x": 0, "y": 39, "w": 12, "h": 7},
+      "targets": [{"expr": "count by (namespace, phase) (kube_pod_status_phase{phase!=\"Succeeded\"})", "format": "table", "instant": true, "refId": "A"}],
+      "transformations": [{"id": "organize", "options": {"renameByName": {"namespace": "Namespace", "phase": "Phase", "Value": "Count"}, "excludeByName": {"Time": true}}}]
+    },
+    {
+      "id": 304,
+      "type": "table",
+      "title": "🗄️ Top Memory Consumers",
+      "gridPos": {"x": 12, "y": 39, "w": 12, "h": 7},
+      "targets": [{"expr": "topk(10, sum by (pod, namespace) (container_memory_working_set_bytes{container!=\"\",pod!=\"\"}) / 1048576)", "format": "table", "instant": true, "refId": "A"}],
+      "transformations": [{"id": "organize", "options": {"renameByName": {"namespace": "Namespace", "pod": "Pod", "Value": "Memory (MB)"}, "excludeByName": {"Time": true}}}]
+    }
+  ]
+}
