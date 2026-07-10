@@ -91,8 +91,8 @@ spec:
             runAsUser: 65532
             allowPrivilegeEscalation: false
           resources:
-            limits: {cpu: 300m, memory: 256Mi}
-            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 200m, memory: 256Mi}
+            requests: {cpu: 30m, memory: 64Mi}
           volumeMounts:
             - name: datasources
               mountPath: /etc/grafana/provisioning/datasources
