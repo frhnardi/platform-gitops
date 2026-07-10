@@ -48,7 +48,7 @@
       },
       "targets": [
         {
-          "expr": "clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.25 + sum(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.25 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.25 + (1 - (sum(increase(kube_pod_container_status_restarts_total[1h])) / (count(kube_pod_container_status_restarts_total) + 1))) * 0.15 - clamp_max(count(kube_event_created{type=\"Warning\"}) * 0.02, 10) * 0.10), 100)",
+          "expr": "clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.30 + count(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.30 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.30 + (1 - (sum(increase(kube_pod_container_status_restarts_total[1h])) / (count(kube_pod_container_status_restarts_total) + 1))) * 0.10), 100)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -69,7 +69,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "none",
           "min": 0,
           "max": 100,
           "thresholds": {
@@ -81,15 +81,15 @@
               },
               {
                 "color": "orange",
-                "value": 60
+                "value": 50
               },
               {
                 "color": "yellow",
-                "value": 80
+                "value": 70
               },
               {
                 "color": "green",
-                "value": 95
+                "value": 85
               }
             ]
           }
@@ -108,7 +108,7 @@
       },
       "targets": [
         {
-          "expr": "(clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.25 + sum(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.25 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.25), 100)) - (clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"} offset 24h) / count(kube_node_info) * 0.25 + sum(kube_pod_status_phase{phase=\"Running\"} offset 24h) / count(kube_pod_info) * 0.25 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"} offset 24h) / count(kube_deployment_created) * 0.25), 100))",
+          "expr": "(clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.30 + count(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.30 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.30 + (1 - (sum(increase(kube_pod_container_status_restarts_total[1h])) / (count(kube_pod_container_status_restarts_total) + 1))) * 0.10), 100)) - (clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.30 + count(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.30 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.30 + (1 - (sum(increase(kube_pod_container_status_restarts_total[1h])) / (count(kube_pod_container_status_restarts_total) + 1))) * 0.10), 100) offset 24h)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -174,7 +174,7 @@
       },
       "targets": [
         {
-          "expr": "count(kube_event_created{type=\"Warning\"}) - (count(kube_event_created{type=\"Warning\"} offset 5m) > 0 or vector(0))",
+          "expr": "count(kube_pod_status_phase{phase!=\"Running\"}) or vector(0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -538,7 +538,7 @@
       },
       "targets": [
         {
-          "expr": "count(kube_event_created{type=\"Warning\"})",
+          "expr": "count(kube_pod_status_phase{phase!=\"Running\"}) or vector(0)",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -582,7 +582,7 @@
       },
       "targets": [
         {
-          "expr": "clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.25 + sum(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.25 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.25 + (1 - (sum(increase(kube_pod_container_status_restarts_total[1h])) / (count(kube_pod_container_status_restarts_total) + 1))) * 0.15 - clamp_max(count(kube_event_created{type=\"Warning\"}) * 0.02, 10) * 0.10), 100)",
+          "expr": "clamp_max(100 * (sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) / count(kube_node_info) * 0.30 + count(kube_pod_status_phase{phase=\"Running\"}) / count(kube_pod_info) * 0.30 + sum(kube_deployment_status_condition{condition=\"Available\",status=\"true\"}) / count(kube_deployment_created) * 0.30 + (1 - (sum(increase(kube_pod_container_status_restarts_total[1h])) / (count(kube_pod_container_status_restarts_total) + 1))) * 0.10), 100)",
           "legendFormat": "Health Score",
           "refId": "A",
           "datasource": {
@@ -794,7 +794,7 @@
       },
       "targets": [
         {
-          "expr": "rate(kube_event_created{type=\"Warning\"}[5m])",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total[5m]))",
           "legendFormat": "{{namespace}}/{{involved_object_name}}",
           "refId": "A",
           "datasource": {
