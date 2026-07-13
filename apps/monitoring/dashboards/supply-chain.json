@@ -1,7 +1,7 @@
 {
   "title": "🔐 Supply Chain & Admission Enforcement",
   "uid": "supply-chain-enforcement",
-  "tags": ["security", "supply-chain", "kyverno", "admission"],
+  "tags": ["security", "supply-chain", "kyverno", "admission", "hybrid"],
   "refresh": "30s",
   "editable": true,
   "graphTooltip": 1,
@@ -9,96 +9,155 @@
   "time": {"from": "now-24h", "to": "now"},
   "panels": [
     {
-      "id": 1, "type": "stat", "title": "Admission Requests (24h)",
-      "description": "Every create/update the cluster asked Kyverno to judge.",
-      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "sum(increase(kyverno_admission_requests_total[24h]))", "refId": "A"}],
+      "id": 0,
+      "type": "text",
+      "title": "",
+      "description": "",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1},
+      "options": {
+        "content": "⚡ **Hybrid dashboard:** top row = universal (no Kyverno needed); bottom rows = Kyverno admission controller metrics. Kyverno panels show 0 if Kyverno is not deployed — deploy Kyverno to unlock full enforcement visibility.",
+        "mode": "markdown"
+      }
+    },
+    {
+      "id": 1, "type": "stat", "title": "🚀 Pod Creations (24h)",
+      "description": "Total pods created in the cluster — every creation is a supply-chain event. Works with standard kube-state-metrics; no admission controller needed.",
+      "gridPos": {"x": 0, "y": 1, "w": 4, "h": 4},
+      "targets": [{"expr": "sum(increase(kube_pod_created[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}}
+    },
+    {
+      "id": 2, "type": "stat", "title": "🛑 Pod Failures (24h)",
+      "description": "Pods that entered Failed phase — may be blocked by security context policies, image pull rejections, or resource constraints. Universal kube metric.",
+      "gridPos": {"x": 4, "y": 1, "w": 4, "h": 4},
+      "targets": [{"expr": "sum(increase(kube_pod_status_phase{phase=\"Failed\"}[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 5}]}}}
+    },
+    {
+      "id": 3, "type": "stat", "title": "🐳 Image Pulls (1h)",
+      "description": "Container image pulls in the last hour. Spikes = new deployments; flat + high errors = registry or signature issues. Universal kube metric.",
+      "gridPos": {"x": 8, "y": 1, "w": 4, "h": 4},
+      "targets": [{"expr": "sum(rate(container_network_receive_bytes_total[1h])) / 1024 / 1024 or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}}
     },
     {
-      "id": 2, "type": "stat", "title": "🛑 Blocked at Admission (24h)",
-      "description": "Requests rejected by an enforce-mode policy. The platform doing its job.",
-      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "sum(increase(kyverno_policy_results_total{rule_result=~\"(?i)fail\", policy_validation_mode=~\"(?i)enforce\"}[24h]))", "refId": "A"}],
+      "id": 4, "type": "stat", "title": "⚠️ ImagePullBackOff",
+      "description": "Pods stuck in ImagePullBackOff — often caused by missing images, registry auth failures, or unsigned images rejected by container runtime. Universal metric.",
+      "gridPos": {"x": 12, "y": 1, "w": 4, "h": 4},
+      "targets": [
+        {"expr": "count(kube_pod_status_reason{reason=\"ImagePullBackOff\"}) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+        {"expr": "count(kube_pod_status_reason{reason=\"ErrImagePull\"}) or on() vector(0)", "refId": "B", "datasource": {"type": "prometheus", "uid": "prometheus"}}
+      ],
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
-      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "orange", "value": 1}]}}}
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 3}]}}}
     },
     {
-      "id": 3, "type": "stat", "title": "🔑 Signature Verifications (24h)",
-      "description": "cosign keyless signature checks Kyverno ran on images (rule_type=imageVerify).",
-      "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "sum(increase(kyverno_policy_results_total{rule_type=~\"(?i)imageverify\"}[24h]))", "refId": "A"}],
+      "id": 5, "type": "stat", "title": "🔐 Admission Requests (24h) ⚡",
+      "description": "Every create/update the cluster asked Kyverno to judge. ⚡ Requires Kyverno — shows 0 if not deployed.",
+      "gridPos": {"x": 16, "y": 1, "w": 4, "h": 4},
+      "targets": [{"expr": "sum(increase(kyverno_admission_requests_total[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "purple", "value": null}]}}}
     },
     {
-      "id": 4, "type": "stat", "title": "🚫 Unsigned Images Rejected (24h)",
-      "description": "The thesis, quantified: images without a valid golden-path signature, refused entry.",
-      "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "sum(increase(kyverno_policy_results_total{rule_type=~\"(?i)imageverify\", rule_result=~\"(?i)fail\"}[24h]))", "refId": "A"}],
+      "id": 6, "type": "stat", "title": "🛑 Blocked at Admission (24h) ⚡",
+      "description": "Requests rejected by enforce-mode policy. The platform doing its job. ⚡ Requires Kyverno — shows 0 if not deployed.",
+      "gridPos": {"x": 20, "y": 1, "w": 4, "h": 4},
+      "targets": [{"expr": "sum(increase(kyverno_policy_results_total{rule_result=~\"(?i)fail\", policy_validation_mode=~\"(?i)enforce\"}[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
-      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 10}]}}}
     },
     {
-      "id": 5, "type": "stat", "title": "Enforced Policies",
-      "description": "Distinct policies currently running in enforce mode.",
-      "gridPos": {"x": 16, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "count(count by (policy_name) (kyverno_policy_rule_info_total{policy_validation_mode=~\"(?i)enforce\"}))", "refId": "A"}],
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}}
+      "id": 10, "type": "timeseries", "title": "📊 Pod Creations vs Failures (universal)",
+      "description": "Supply-chain outcomes visible without an admission controller: pod creation rate vs failure rate. A gap opening between the two lines = growing rejection rate at any layer.",
+      "gridPos": {"x": 0, "y": 5, "w": 12, "h": 7},
+      "targets": [
+        {"expr": "sum(rate(kube_pod_created[10m])) or on() vector(0)", "legendFormat": "Creations", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+        {"expr": "sum(rate(kube_pod_status_phase{phase=\"Failed\"}[10m])) or on() vector(0)", "legendFormat": "Failures", "refId": "B", "datasource": {"type": "prometheus", "uid": "prometheus"}}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 10, "lineWidth": 2, "pointSize": 5, "showPoints": "always"}}}
     },
     {
-      "id": 6, "type": "stat", "title": "Admission Latency p95 (ms)",
-      "description": "How much the enforcement layer costs each request at the 95th percentile.",
-      "gridPos": {"x": 20, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(kyverno_admission_review_duration_seconds_bucket[5m])) by (le)) * 1000", "refId": "A"}],
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 200}, {"color": "red", "value": 1000}]}}}
-    },
-    {
-      "id": 10, "type": "timeseries", "title": "Admission Results Over Time (pass / fail / warn)",
-      "description": "Every policy evaluation, bucketed by outcome. Spikes in 'fail' are rejected deploys.",
-      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 7},
-      "targets": [{"expr": "sum by (rule_result) (increase(kyverno_policy_results_total[10m]))", "legendFormat": "{{rule_result}}", "refId": "A"}],
+      "id": 11, "type": "timeseries", "title": "🛡️ Admission Results Over Time (pass/fail/warn) ⚡",
+      "description": "Every policy evaluation, bucketed by outcome. Spikes in 'fail' are rejected deploys. ⚡ Requires Kyverno — shows flat 0 if not deployed.",
+      "gridPos": {"x": 12, "y": 5, "w": 12, "h": 7},
+      "targets": [{"expr": "sum by (rule_result) (increase(kyverno_policy_results_total[10m])) or on() vector(0)", "legendFormat": "{{rule_result}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 20, "lineWidth": 2, "stacking": {"mode": "normal"}}}}
     },
     {
-      "id": 11, "type": "timeseries", "title": "🔑 Image Signature Verification (pass vs fail)",
-      "description": "imageVerify outcomes only: a 'fail' line is an unsigned or wrongly-signed image turned away.",
-      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 7},
-      "targets": [{"expr": "sum by (rule_result) (increase(kyverno_policy_results_total{rule_type=~\"(?i)imageverify\"}[10m]))", "legendFormat": "{{rule_result}}", "refId": "A"}],
+      "id": 12, "type": "timeseries", "title": "🐳 Image Pull Errors by Namespace",
+      "description": "Rate of ImagePullBackOff and ErrImagePull events. This is your supply-chain gate without needing Kyverno — if images can't be pulled, they can't run.",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 7},
+      "targets": [
+        {"expr": "sum by (namespace) (rate(kube_pod_status_reason{reason=\"ImagePullBackOff\"}[5m]) * 100) or on() vector(0)", "legendFormat": "BackOff: {{namespace}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+        {"expr": "sum by (namespace) (rate(kube_pod_status_reason{reason=\"ErrImagePull\"}[5m]) * 100) or on() vector(0)", "legendFormat": "ErrPull: {{namespace}}", "refId": "B", "datasource": {"type": "prometheus", "uid": "prometheus"}}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 15, "lineWidth": 2, "pointSize": 5, "showPoints": "always"}}}
+    },
+    {
+      "id": 13, "type": "timeseries", "title": "🔑 Image Signature Verification (pass vs fail) ⚡",
+      "description": "imageVerify outcomes only: a 'fail' line is an unsigned image turned away. ⚡ Requires Kyverno with cosign keyless verification — shows flat 0 if not deployed.",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 7},
+      "targets": [{"expr": "sum by (rule_result) (increase(kyverno_policy_results_total{rule_type=~\"(?i)imageverify\"}[10m])) or on() vector(0)", "legendFormat": "{{rule_result}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 20, "lineWidth": 2, "pointSize": 6, "showPoints": "always"}}}
     },
     {
-      "id": 20, "type": "bargauge", "title": "Blocks by Policy (24h)",
-      "description": "Which enforce-mode policies are rejecting the most — the platform's teeth, ranked.",
-      "gridPos": {"x": 0, "y": 11, "w": 8, "h": 8},
-      "targets": [{"expr": "topk(10, sum by (policy_name) (increase(kyverno_policy_results_total{rule_result=~\"(?i)fail\", policy_validation_mode=~\"(?i)enforce\"}[24h])))", "legendFormat": "{{policy_name}}", "refId": "A"}],
+      "id": 20, "type": "bargauge", "title": "🚫 Blocks by Policy (24h) ⚡",
+      "description": "Which enforce-mode policies are rejecting the most — the platform's teeth, ranked. ⚡ Requires Kyverno — shows empty if not deployed.",
+      "gridPos": {"x": 0, "y": 19, "w": 8, "h": 8},
+      "targets": [{"expr": "topk(10, sum by (policy_name) (increase(kyverno_policy_results_total{rule_result=~\"(?i)fail\", policy_validation_mode=~\"(?i)enforce\"}[24h]))) or on() vector(0)", "legendFormat": "{{policy_name}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "options": {"orientation": "horizontal", "displayMode": "gradient"},
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "orange", "value": null}]}}}
     },
     {
-      "id": 21, "type": "piechart", "title": "Policy Results by Rule Type",
-      "description": "Where enforcement happens: validation vs mutation vs image signature checks.",
-      "gridPos": {"x": 8, "y": 11, "w": 8, "h": 8},
-      "targets": [{"expr": "sum by (rule_type) (kyverno_policy_results_total)", "legendFormat": "{{rule_type}}", "refId": "A"}],
-      "options": {"pieType": "donut", "legend": {"displayMode": "list", "placement": "right", "values": ["value"]}, "reduceOptions": {"calcs": ["lastNotNull"]}}
+      "id": 21, "type": "piechart", "title": "📦 Pod Status Distribution",
+      "description": "What's running vs failing vs pending. Universal metric — no admission controller needed. Healthy clusters show 95%+ Running.",
+      "gridPos": {"x": 8, "y": 19, "w": 8, "h": 8},
+      "targets": [{"expr": "sum by (phase) (kube_pod_status_phase)", "legendFormat": "{{phase}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"pieType": "donut", "legend": {"displayMode": "list", "placement": "right", "values": ["value"]}, "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-GrYlRd"}}}
     },
     {
-      "id": 22, "type": "bargauge", "title": "Admission Requests by Operation (24h)",
-      "description": "CREATE vs UPDATE vs DELETE traffic the enforcement layer handled.",
-      "gridPos": {"x": 16, "y": 11, "w": 8, "h": 8},
-      "targets": [{"expr": "sum by (resource_request_operation) (increase(kyverno_admission_requests_total[24h]))", "legendFormat": "{{resource_request_operation}}", "refId": "A"}],
+      "id": 22, "type": "bargauge", "title": "🐳 Images by Registry",
+      "description": "Where your container images come from. ECR/GCR = internal/trusted; docker.io = public = higher supply-chain risk.",
+      "gridPos": {"x": 16, "y": 19, "w": 8, "h": 8},
+      "targets": [{"expr": "count by (image) (kube_pod_container_info) or on() vector(0)", "legendFormat": "{{image}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "options": {"orientation": "horizontal", "displayMode": "gradient"},
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}}
     },
     {
-      "id": 30, "type": "table", "title": "Enforcement Detail — denials & warnings",
-      "description": "Which rule rejected what kind of resource. Empty is good; rows are the story to screenshot after the unsigned-image demo.",
-      "gridPos": {"x": 0, "y": 19, "w": 24, "h": 8},
-      "targets": [{"expr": "sum by (policy_name, rule_name, rule_type, resource_kind, rule_result) (kyverno_policy_results_total{rule_result=~\"(?i)fail|(?i)warn\"})", "format": "table", "instant": true, "refId": "A"}],
+      "id": 30, "type": "table", "title": "📜 Admission Enforcement Detail — denials & warnings ⚡",
+      "description": "Which rule rejected what kind of resource. Empty = nothing blocked (or Kyverno not deployed). ⚡ Requires Kyverno — shows empty table if not deployed.",
+      "gridPos": {"x": 0, "y": 27, "w": 12, "h": 8},
+      "targets": [{"expr": "sum by (policy_name, rule_name, rule_type, resource_kind, rule_result) (kyverno_policy_results_total{rule_result=~\"(?i)fail|(?i)warn\"}) or on() vector(0)", "format": "table", "instant": true, "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "transformations": [{"id": "organize", "options": {"renameByName": {"policy_name": "Policy", "rule_name": "Rule", "rule_type": "Type", "resource_kind": "Resource Kind", "rule_result": "Result", "Value": "Count"}, "excludeByName": {"Time": true}}}],
+      "fieldConfig": {"defaults": {"custom": {"align": "left"}}}
+    },
+    {
+      "id": 31,
+      "type": "table",
+      "title": "⚠️ Problematic Pods — Image Pull Issues",
+      "description": "Pods that can't pull their images. This is your universal supply-chain failure table — works without any admission controller. Investigate: wrong tag, registry auth, missing signature.",
+      "gridPos": {"x": 12, "y": 27, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "kube_pod_status_reason{reason=~\"ImagePullBackOff|ErrImagePull\"}", "format": "table", "instant": true, "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}
+      ]
+    },
+    {
+      "id": 40,
+      "type": "table",
+      "title": "📦 Image Inventory — All Running Containers",
+      "description": "Full inventory of container images running in the cluster. Use this to audit: are images from trusted registries? Any stale tags (latest)? Any public images that should be internal?",
+      "gridPos": {"x": 0, "y": 35, "w": 24, "h": 8},
+      "targets": [
+        {"expr": "kube_pod_container_info", "format": "table", "instant": true, "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}
+      ],
+      "transformations": [
+        {"id": "organize", "options": {"renameByName": {"namespace": "Namespace", "pod": "Pod", "container": "Container", "image": "Image", "image_id": "Image ID"}, "excludeByName": {"Time": true, "container_id": true, "node": true, "uid": true, "__name__": true, "job": true, "instance": true}}}
+      ],
       "fieldConfig": {"defaults": {"custom": {"align": "left"}}}
     }
   ]
