@@ -177,6 +177,51 @@
       "gridPos": {"x": 12, "y": 19, "w": 12, "h": 7},
       "targets": [{"expr": "count by (namespace, phase) (kube_pod_status_phase{phase!=\"Succeeded\"})", "format": "table", "instant": true, "refId": "A"}],
       "transformations": [{"id": "organize", "options": {"renameByName": {"namespace": "Namespace", "phase": "Phase", "Value": "Count"}, "excludeByName": {"Time": true}}}]
+    },
+    {
+      "id": 60, "type": "row", "title": "🚀 DORA — Delivery Performance (commit → running pod)",
+      "gridPos": {"x": 0, "y": 26, "w": 24, "h": 1}, "collapsed": false, "panels": []
+    },
+    {
+      "id": 61, "type": "stat", "title": "Deployments (7d)",
+      "gridPos": {"x": 0, "y": 27, "w": 4, "h": 4},
+      "targets": [{"expr": "sum(increase(dora_deployments_total[7d]))", "refId": "A"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}}
+    },
+    {
+      "id": 62, "type": "stat", "title": "Last Lead Time",
+      "gridPos": {"x": 4, "y": 27, "w": 4, "h": 4},
+      "targets": [{"expr": "max(dora_last_lead_time_seconds)", "refId": "A"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 3600}, {"color": "red", "value": 86400}]}}}
+    },
+    {
+      "id": 63, "type": "stat", "title": "Median Lead Time (30d)",
+      "gridPos": {"x": 8, "y": 27, "w": 4, "h": 4},
+      "targets": [{"expr": "histogram_quantile(0.5, sum(rate(dora_deployment_lead_time_seconds_bucket[30d])) by (le))", "refId": "A"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 3600}, {"color": "red", "value": 86400}]}}}
+    },
+    {
+      "id": 64, "type": "stat", "title": "Time Since Last Deploy",
+      "gridPos": {"x": 12, "y": 27, "w": 4, "h": 4},
+      "targets": [{"expr": "time() - max(dora_last_deployment_timestamp_seconds)", "refId": "A"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}}
+    },
+    {
+      "id": 65, "type": "bargauge", "title": "Deployments by Service (7d)",
+      "gridPos": {"x": 16, "y": 27, "w": 8, "h": 8},
+      "targets": [{"expr": "sum by (service) (increase(dora_deployments_total[7d]))", "legendFormat": "{{service}}", "refId": "A"}],
+      "options": {"orientation": "horizontal", "displayMode": "gradient"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}}
+    },
+    {
+      "id": 66, "type": "timeseries", "title": "Lead Time by Service (commit → serving)",
+      "gridPos": {"x": 0, "y": 31, "w": 16, "h": 6},
+      "targets": [{"expr": "dora_last_lead_time_seconds", "legendFormat": "{{service}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"fillOpacity": 15, "lineWidth": 2, "drawStyle": "line", "pointSize": 6, "showPoints": "always"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 3600}]}}}
     }
   ]
 }

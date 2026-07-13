@@ -1,0 +1,115 @@
+# DORA exporter — reads completed rollouts in the app namespace and exposes
+# lead-time / deployment-frequency metrics for Prometheus. Source and rationale:
+# ./dora-exporter/ and ADR-0011.
+#
+# NOTE: the monitoring kustomization sets `namespace: monitoring`, which rewrites
+# every *namespaced* resource below into that namespace. RBAC for reading the
+# `apps` namespace is therefore expressed cluster-scoped (ClusterRole/-Binding),
+# which the namespace transformer leaves alone — same pattern prometheus uses.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dora-exporter
+---
+# Read-only, deployments only. The exporter never mutates anything.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dora-exporter
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dora-exporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dora-exporter
+subjects:
+  - kind: ServiceAccount
+    name: dora-exporter
+    namespace: monitoring
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dora-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dora-exporter
+  template:
+    metadata:
+      labels:
+        app: dora-exporter
+    spec:
+      serviceAccountName: dora-exporter
+      # Same node story as the rest of the observability stack: run on the cheap
+      # spot pool, tolerate the system-node taint.
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+          effect: NoSchedule
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dora-exporter
+          # Built and keyless-signed through the golden path, pinned by digest —
+          # the platform's own tooling obeys the same supply-chain rules it
+          # enforces on services. Replace with the promoted digest after the
+          # first golden-path build of ./dora-exporter/.
+          image: prpacrdev.azurecr.io/dora-exporter@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          env:
+            - name: DORA_NAMESPACE
+              value: apps
+            - name: DORA_POLL_INTERVAL_SECONDS
+              value: "30"
+          ports:
+            - name: metrics
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 20m
+              memory: 48Mi
+            limits:
+              cpu: 100m
+              memory: 96Mi
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dora-exporter
+  labels:
+    app: dora-exporter
+spec:
+  selector:
+    app: dora-exporter
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
