@@ -1,27 +1,25 @@
+# DeepSeek alert-RCA webhook — hardened.
+#
+# Grafana routes firing alerts here (see grafana.yaml contactPoints); this asks
+# an LLM for a root-cause analysis and logs it to Loki. Source, tests, and the
+# Dockerfile live in ./deepseek-webhook/ and ADR-0010.
+#
+# What changed from the original: the app is no longer an inline `python -c`
+# heredoc that ran `pip install` as root on a writable rootfs at container start
+# (that would violate the platform's own baseline policies). It is now a proper
+# signed image running nonroot on a read-only rootfs, and the API key is NOT
+# committed to Git — it comes from a Secret, ideally synced from Azure Key Vault.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: deepseek-webhook-config
   namespace: monitoring
 data:
-  config.yaml: |
-    deepseek:
-      base_url: "https://api.deepseek.com/v1"
-      model: "deepseek-chat"
-      max_tokens: 1024
-    prometheus:
-      url: "http://prometheus.monitoring:9090"
-    loki:
-      url: "http://loki.monitoring:3100"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: deepseek-api-key
-  namespace: monitoring
-type: Opaque
-stringData:
-  DEEPSEEK_API_KEY: "placeholder-set-your-key"
+  # Plain values consumed as individual env vars. (The previous version mounted a
+  # whole YAML document into one env var by mistake — fixed here.)
+  DEEPSEEK_BASE_URL: "https://api.deepseek.com/v1"
+  DEEPSEEK_MODEL: "deepseek-chat"
+  DEEPSEEK_MAX_TOKENS: "1024"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -46,142 +44,72 @@ spec:
           operator: Equal
           value: spot
           effect: NoSchedule
-        - key: kubernetes.azure.com/scalesetpriority
-          operator: Equal
-          value: spot
-          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: webhook
-          image: python:3.12-slim
-          command:
-            - /bin/sh
-            - -c
-            - |
-              pip install --no-cache-dir fastapi uvicorn httpx && \
-              python -c "
-              from fastapi import FastAPI, Request
-              from fastapi.responses import JSONResponse
-              import httpx
-              import json
-              import os
-              import datetime
-
-              app = FastAPI(title='DeepSeek Alert RCA')
-
-              DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
-              DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
-              MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
-
-              @app.get('/healthz')
-              async def health():
-                  return {'status': 'ok'}
-
-              @app.post('/webhook')
-              async def webhook(request: Request):
-                  body = await request.json()
-                  alerts = body.get('alerts', [])
-                  title = body.get('title', 'No title')
-                  
-                  if not alerts:
-                      return JSONResponse({'status': 'no alerts'})
-                  
-                  # Build analysis prompt
-                  alert_summaries = []
-                  for a in alerts[:5]:  # limit to 5 alerts
-                      labels = a.get('labels', {})
-                      annotations = a.get('annotations', {})
-                      alert_summaries.append(
-                          f\"Alert: {annotations.get('summary', labels.get('alertname', 'unknown'))}\\n\"
-                          f\"  Severity: {labels.get('severity', 'unknown')}\\n\"
-                          f\"  Namespace: {labels.get('namespace', 'N/A')}\\n\"
-                          f\"  Description: {annotations.get('description', 'N/A')[:500]}\"
-                      )
-                  
-                  prompt = f'''You are a Site Reliability Engineer analyzing Kubernetes monitoring alerts. 
-              Provide root cause analysis and actionable remediation steps for these alerts:
-
-              {chr(10).join(alert_summaries)}
-
-              Format your response as:
-              1. **Root Cause Analysis**: What likely caused these alerts
-              2. **Impact Assessment**: What's affected
-              3. **Remediation Steps**: Specific kubectl/helm commands to fix
-              4. **Prevention**: How to prevent recurrence
-              '''
-                  
-                  analysis = 'DeepSeek API not configured. Set DEEPSEEK_API_KEY secret.'
-                  
-                  if DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != 'placeholder-set-your-key':
-                      try:
-                          async with httpx.AsyncClient(timeout=30.0) as client:
-                              resp = await client.post(
-                                  f'{DEEPSEEK_BASE_URL}/chat/completions',
-                                  headers={
-                                      'Authorization': f'Bearer {DEEPSEEK_API_KEY}',
-                                      'Content-Type': 'application/json'
-                                  },
-                                  json={
-                                      'model': MODEL,
-                                      'messages': [
-                                          {'role': 'system', 'content': 'You are an expert SRE and Kubernetes operator.'},
-                                          {'role': 'user', 'content': prompt}
-                                      ],
-                                      'max_tokens': 1024,
-                                      'temperature': 0.3
-                                  }
-                              )
-                              if resp.status_code == 200:
-                                  result = resp.json()
-                                  analysis = result['choices'][0]['message']['content']
-                              else:
-                                  analysis = f'DeepSeek API error: {resp.status_code} - {resp.text[:200]}'
-                      except Exception as e:
-                          analysis = f'Error calling DeepSeek API: {str(e)}'
-                  
-                  timestamp = datetime.datetime.utcnow().isoformat()
-                  log_entry = {
-                      'timestamp': timestamp,
-                      'title': title,
-                      'alert_count': len(alerts),
-                      'analysis': analysis[:2000]
-                  }
-                  
-                  # Log analysis to stdout (will be collected by Promtail/Loki)
-                  print(json.dumps(log_entry))
-                  
-                  return JSONResponse({
-                      'status': 'analyzed',
-                      'timestamp': timestamp,
-                      'analysis': analysis[:2000]
-                  })
-
-              if __name__ == '__main__':
-                  import uvicorn
-                  uvicorn.run(app, host='0.0.0.0', port=8080)
-              "
+          # Built and keyless-signed through the golden path, pinned by digest —
+          # dogfooding the same supply chain the platform enforces. Replace with
+          # the promoted digest after the first golden-path build of
+          # ./deepseek-webhook/.
+          image: prpacrdev.azurecr.io/deepseek-webhook@sha256:0000000000000000000000000000000000000000000000000000000000000000
           env:
             - name: DEEPSEEK_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: deepseek-api-key
                   key: DEEPSEEK_API_KEY
+                  # optional: the app starts and reports "not configured" until
+                  # the secret exists, so a missing key never crash-loops the pod.
+                  optional: true
             - name: DEEPSEEK_BASE_URL
               valueFrom:
                 configMapKeyRef:
                   name: deepseek-webhook-config
-                  key: config.yaml
-                  optional: true
+                  key: DEEPSEEK_BASE_URL
+            - name: DEEPSEEK_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: deepseek-webhook-config
+                  key: DEEPSEEK_MODEL
+            - name: DEEPSEEK_MAX_TOKENS
+              valueFrom:
+                configMapKeyRef:
+                  name: deepseek-webhook-config
+                  key: DEEPSEEK_MAX_TOKENS
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           resources:
-            limits: {cpu: 200m, memory: 256Mi}
-            requests: {cpu: 50m, memory: 128Mi}
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
           readinessProbe:
             httpGet:
               path: /healthz
-              port: 8080
-            initialDelaySeconds: 10
+              port: http
+            initialDelaySeconds: 5
             periodSeconds: 10
+          # readOnlyRootFilesystem: give the process a writable scratch dir.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -193,4 +121,41 @@ spec:
     app: deepseek-webhook
   ports:
     - port: 8080
-      targetPort: 8080
+      targetPort: http
+#
+# ── Populating the API key (no secret in Git) ────────────────────────────────
+# The `deepseek-api-key` Secret above is intentionally NOT committed. Two ways to
+# create it, in order of preference:
+#
+# 1. Azure Key Vault (recommended — the platform already provisions Key Vault
+#    with RBAC + workload identity in platform-infra). Enable the AKS addon
+#    `azure-keyvault-secrets-provider`, then apply a SecretProviderClass with
+#    `secretObjects` that syncs the vault secret into the `deepseek-api-key`
+#    Secret, and mount its CSI volume on this Deployment. Sketch:
+#
+#      apiVersion: secrets-store.csi.x-k8s.io/v1
+#      kind: SecretProviderClass
+#      metadata: {name: deepseek-kv, namespace: monitoring}
+#      spec:
+#        provider: azure
+#        parameters:
+#          usePodIdentity: "false"
+#          useVMManagedIdentity: "false"
+#          clientID: "<KEYVAULT_CSI_CLIENT_ID>"     # from platform-infra output
+#          keyvaultName: "<PRP_KEYVAULT_NAME>"      # e.g. prpkvdev
+#          tenantId: "<AZURE_TENANT_ID>"
+#          objects: |
+#            array:
+#              - |
+#                objectName: deepseek-api-key
+#                objectType: secret
+#        secretObjects:
+#          - secretName: deepseek-api-key
+#            type: Opaque
+#            data:
+#              - objectName: deepseek-api-key
+#                key: DEEPSEEK_API_KEY
+#
+# 2. Manual (lab shortcut):
+#      kubectl -n monitoring create secret generic deepseek-api-key \
+#        --from-literal=DEEPSEEK_API_KEY=sk-...your-key...
