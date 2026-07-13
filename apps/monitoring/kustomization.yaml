@@ -6,6 +6,7 @@ resources:
   - prometheus.yaml
   - loki.yaml
   - deepseek-webhook.yaml
+  - dora-exporter.yaml
   - ingress.yaml
 configMapGenerator:
   - name: grafana-dashboards
@@ -18,5 +19,6 @@ configMapGenerator:
       - dashboards/security.json
       - dashboards/security-posture.json
       - dashboards/cost-efficiency.json
+      - dashboards/supply-chain.json
 generatorOptions:
   disableNameSuffixHash: true
