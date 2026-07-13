@@ -1,0 +1,4 @@
+# Pinned exact versions (supply-chain hygiene — the platform's own tooling must
+# be as pinned as the services it governs). Bump deliberately, not with a range.
+kubernetes==31.0.0
+prometheus-client==0.21.1

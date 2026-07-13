@@ -44,6 +44,13 @@ data:
           - source_labels: [__name__]
             regex: kyverno_.*
             action: keep
+      - job_name: dora-exporter
+        static_configs:
+          - targets: ['dora-exporter.monitoring:8080']
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: dora_.*
+            action: keep
 ---
 apiVersion: v1
 kind: ServiceAccount
