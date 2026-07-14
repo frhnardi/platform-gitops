@@ -1,5 +1,10 @@
-apiVersion: apps/v1
-kind: Deployment
+# Argo Rollout — the progressive-delivery replacement for the plain Deployment.
+# The pod template below is copied verbatim from the old deployment.yaml (same
+# labels, hardened securityContext, resources, probes, volumes, container name
+# and bare image name), so the Kyverno admission contract and the golden-path
+# promotion still hold. The controller comes from apps/argo-rollouts.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: sample-service
   labels:
@@ -10,6 +15,23 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: sample-service
+  # Progressive delivery: shift traffic to the new ReplicaSet in weighted steps
+  # with pauses between them, so a bad build is caught before it reaches 100%.
+  # A first promotion holds at each pause until it is resumed (via GitOps or the
+  # kubectl-argo-rollouts plugin: `kubectl argo rollouts promote sample-service`).
+  #
+  # This is a self-contained stepped canary — no metric analysis. To gate each
+  # step automatically, an AnalysisTemplate querying the cluster's Prometheus
+  # (apps/monitoring/) could be referenced here to auto-promote or abort on SLOs;
+  # that is intentionally left out to keep the paved road simple.
+  strategy:
+    canary:
+      steps:
+        - setWeight: 25
+        - pause: { duration: 30s }
+        - setWeight: 50
+        - pause: { duration: 30s }
+        - setWeight: 100
   template:
     metadata:
       labels:
