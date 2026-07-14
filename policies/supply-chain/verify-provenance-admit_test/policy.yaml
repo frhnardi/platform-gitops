@@ -1,0 +1,65 @@
+# TEST FIXTURE ONLY — not shipped, not in any kustomization.
+#
+# Structurally identical to ../verify-provenance.yaml (Audit verify + Enforce
+# validate), but pinned to a real public attestation we can verify locally:
+# ghcr.io/kyverno/zulu's SLSA provenance attestation, signed keyless by
+# chipzoller/zulu's slsa-generic-keyless workflow. Production requires SLSA v1.0
+# provenance from the golden-path identity; swap the type + identity and this IS
+# the production policy. (The public zulu image carries the older v0.2 predicate,
+# so the stand-in verifies v0.2 — the only difference from production.)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-provenance-stand-in
+spec:
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  background: false
+  rules:
+    - name: verify-zulu-provenance
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/kyverno/zulu:*"
+          failureAction: Audit
+          required: true
+          mutateDigest: false
+          verifyDigest: false
+          attestations:
+            - type: https://slsa.dev/provenance/v0.2
+              attestors:
+                - count: 1
+                  entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: ^https://github\.com/chipzoller/zulu/\.github/workflows/slsa-generic-keyless\.yaml@refs/tags/v.+$
+                        rekor:
+                          url: https://rekor.sigstore.dev
+                        ctlog:
+                          ignoreSCT: true
+    - name: require-zulu-provenance
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      validate:
+        failureAction: Enforce
+        message: >-
+          stand-in: image lacks the expected SLSA provenance attestation.
+        deny:
+          conditions:
+            any:
+              - key: fail
+                operator: AnyIn
+                value: '{{ (request.object.metadata.annotations."kyverno.io/verify-images" || ''{}'') | parse_json(@) | values(@) }}'

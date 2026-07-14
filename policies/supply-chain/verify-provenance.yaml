@@ -1,0 +1,78 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-provenance
+  annotations:
+    policies.kyverno.io/title: Verify SLSA Build Provenance (Golden Path)
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod, Image
+    policies.kyverno.io/description: >-
+      Requires a SLSA v1.0 build-provenance attestation signed keyless by the
+      golden-path workflow identity. The signature proves who signed the image;
+      the SBOM proves what is inside it; the provenance proves HOW and from what
+      source it was built — closing the "was this built by our reviewed pipeline
+      or slipped in?" gap (SLSA Build L3 in spirit: non-falsifiable, signed by
+      the build platform's own OIDC identity, not the author's).
+spec:
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  background: false
+  rules:
+    # Rule 1: verify the SLSA provenance attestation (Audit -> records pass/fail
+    # in the shared kyverno.io/verify-images annotation, does not block here).
+    - name: verify-golden-path-provenance
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      verifyImages:
+        - imageReferences:
+            - "*"
+          failureAction: Audit
+          required: true
+          mutateDigest: false
+          verifyDigest: false
+          attestations:
+            # in-toto predicate type emitted by `cosign attest --type slsaprovenance1`.
+            - type: https://slsa.dev/provenance/v1
+              attestors:
+                - count: 1
+                  entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: ^https://github\.com/frhnardi/platform-golden-path/\.github/workflows/golden-path\.yml@refs/heads/main$
+                        rekor:
+                          url: https://rekor.sigstore.dev
+                        ctlog:
+                          ignoreSCT: true
+    # Rule 2: the actionable block for missing/invalid provenance.
+    - name: require-golden-path-provenance
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  paved-road.platform/tier: app
+      validate:
+        failureAction: Enforce
+        message: >-
+          This image has no SLSA build-provenance attestation signed by the golden
+          path, so the cluster can't prove how or from what source it was built —
+          provenance is what answers "was this built from reviewed source by our
+          pipeline, or slipped in from a laptop?". The golden-path pipeline emits
+          SLSA v1.0 provenance and attaches it as a keyless-signed attestation
+          (cosign attest --type slsaprovenance1). Ship it through the paved road:
+          https://github.com/frhnardi/platform-golden-path#quickstart
+        deny:
+          conditions:
+            any:
+              - key: fail
+                operator: AnyIn
+                value: '{{ (request.object.metadata.annotations."kyverno.io/verify-images" || ''{}'') | parse_json(@) | values(@) }}'
