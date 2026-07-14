@@ -30,14 +30,30 @@ spec:
             namespace: kyverno
         # Dev is cost-constrained (ADR-0002): one replica per controller.
         # A prod overlay would restore the chart's HA defaults.
+        #
+        # The system node is tainted CriticalAddonsOnly and workloads run on the
+        # spot pool; the upstream chart sets no tolerations, so every controller
+        # must carry them or the admission engine can't schedule on a freshly
+        # built cluster (it did not, on the first rebuild).
         admissionController:
           replicas: 1
+          tolerations: &spotTolerations
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+            - key: kubernetes.azure.com/scalesetpriority
+              operator: Equal
+              value: spot
+              effect: NoSchedule
         backgroundController:
           replicas: 1
+          tolerations: *spotTolerations
         cleanupController:
           replicas: 1
+          tolerations: *spotTolerations
         reportsController:
           replicas: 1
+          tolerations: *spotTolerations
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
