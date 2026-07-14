@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# No global `namespace:` on purpose — resources span two namespaces:
+#   demo-seeder (the CronJob + its ServiceAccount) and apps (the Role/RoleBinding
+#   that lets it *attempt* pods there). Each resource carries its own namespace.
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - cronjob.yaml
