@@ -8,3 +8,4 @@ kind: Kustomization
 resources:
   - verify-image-signature.yaml
   - verify-sbom-attestation.yaml
+  - verify-provenance.yaml

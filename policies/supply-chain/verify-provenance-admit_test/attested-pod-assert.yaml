@@ -1,0 +1,7 @@
+# The SLSA provenance attestation verified -> Kyverno records "pass" for the image.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: provenanced
+  annotations:
+    kyverno.io/verify-images: '{"ghcr.io/kyverno/zulu:v0.0.14":"pass"}'

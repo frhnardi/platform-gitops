@@ -1,0 +1,28 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: verify-provenance-admit
+# Proves an image carrying a valid, correctly-signed SLSA provenance attestation
+# is admitted, with the verification recorded as a pass.
+spec:
+  timeouts:
+    apply: 90s
+    assert: 90s
+    exec: 150s
+  namespaceTemplate:
+    metadata:
+      labels:
+        paved-road.platform/tier: app
+  steps:
+    - name: install-stand-in-policy
+      try:
+        - apply:
+            file: policy.yaml
+        - script:
+            content: kubectl wait --for=condition=Ready --timeout=120s clusterpolicy/verify-provenance-stand-in
+    - name: image-with-provenance-is-admitted-with-pass-recorded
+      try:
+        - apply:
+            file: attested-pod.yaml
+        - assert:
+            file: attested-pod-assert.yaml
