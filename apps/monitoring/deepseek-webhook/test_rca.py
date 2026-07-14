@@ -1,6 +1,13 @@
 """Unit tests for the pure RCA helpers. No web stack or network needed."""
 
-from rca import PLACEHOLDER_KEY, api_key_configured, build_prompt, summarize_alert
+from rca import (
+    PLACEHOLDER_KEY,
+    api_key_configured,
+    build_falco_prompt,
+    build_prompt,
+    summarize_alert,
+    summarize_falco_event,
+)
 
 
 def test_summarize_prefers_annotations_summary():
@@ -42,3 +49,33 @@ def test_api_key_configured():
     assert api_key_configured("sk-real-key")
     assert not api_key_configured("")
     assert not api_key_configured(PLACEHOLDER_KEY)
+
+
+def test_summarize_falco_event_pulls_k8s_fields():
+    event = {
+        "rule": "Terminal shell in container",
+        "priority": "Warning",
+        "output": "A shell was spawned in a container (pod=api-7f user=root)",
+        "output_fields": {"k8s.ns.name": "apps", "k8s.pod.name": "api-7f"},
+    }
+    out = summarize_falco_event(event)
+    assert "Rule: Terminal shell in container" in out
+    assert "Priority: Warning" in out
+    assert "Namespace: apps" in out
+    assert "Pod: api-7f" in out
+    assert "A shell was spawned" in out
+
+
+def test_summarize_falco_event_tolerates_missing_fields():
+    out = summarize_falco_event({"rule": "Unexpected outbound connection"})
+    assert "Rule: Unexpected outbound connection" in out
+    assert "Namespace: N/A" in out
+    assert "Pod: N/A" in out
+    assert "Detail: N/A" in out
+
+
+def test_build_falco_prompt_asks_for_containment():
+    prompt = build_falco_prompt({"rule": "Write below etc", "priority": "Error"})
+    assert "Falco" in prompt
+    assert "Containment" in prompt
+    assert "Write below etc" in prompt

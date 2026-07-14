@@ -1,0 +1,184 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Falco — runtime threat detection for the cluster (defense in depth).
+  #
+  # WHY, on top of Kyverno: Kyverno is an ADMISSION-time control — it prevents bad
+  # workloads from ever being created (unsigned images, privileged pods, :latest,
+  # missing limits). But admission control is blind once a Pod is running: a
+  # legitimately-admitted container that gets exploited (reverse shell, crypto
+  # miner, /etc/shadow read, unexpected outbound connection, package install at
+  # runtime) is invisible to it. Falco watches the kernel syscall stream on every
+  # node and alerts on that *runtime* behaviour. Prevention (Kyverno) + detection
+  # (Falco) is the defense-in-depth pairing this platform is missing.
+  #
+  # DRIVER CHOICE — modern eBPF (CO-RE), NOT the kernel module:
+  #   * No kernel-module compile/DKMS, no privileged driver-loader init container,
+  #     and no node reboot — the probe is CO-RE (compile-once-run-everywhere) and
+  #     loads against the running kernel's BTF. AKS Ubuntu 22.04 nodes (kernel
+  #     5.15) ship BTF and satisfy the modern-eBPF floor (kernel >= 5.8).
+  #   * Lower operational blast radius than kmod on a managed node pool we don't
+  #     control the image of — nothing to rebuild when AKS rolls a node image.
+  #
+  # PRIVILEGE / NAMESPACE DECISION (deliberate — read before "hardening" this):
+  #   Falco is the ONE sanctioned privileged workload on the platform. To capture
+  #   syscalls it needs host access (privileged container, host PID, hostPath
+  #   mounts of /proc, /dev, containerd socket) — exactly what the baseline
+  #   pod-security policies forbid. Those policies run in ENFORCE only in
+  #   namespaces labeled `paved-road.platform/tier: app`, and AUDIT everywhere
+  #   else. So Falco lives in its OWN dedicated `falco` namespace that is labeled
+  #   `tier: platform` (NOT `tier: app`) — baseline policies are Audit there, so
+  #   they observe/report Falco's privilege without BLOCKING it. This keeps the
+  #   Enforce guarantee intact for real app workloads while giving the security
+  #   sensor the access it genuinely requires. It is not a loophole: it is scoped
+  #   to one namespace that runs nothing but the sensor.
+  #
+  # Deployed from the official upstream Falco Helm chart, pinned (consuming an
+  # upstream chart via ArgoCD is allowed; CLAUDE.md only forbids authoring Helm
+  # charts in this repo). Managed by the app-of-apps root (apps/root.yaml).
+  # ─────────────────────────────────────────────────────────────────────────────
+  name: falco
+  namespace: argocd
+  annotations:
+    # Wave 2: come up after core platform — Kyverno/ingress (wave 0), policies
+    # (wave 1) and monitoring (wave 2). Landing alongside monitoring means the
+    # falcosidekick fan-out targets (deepseek-webhook + loki, both in the
+    # monitoring namespace) already exist; if one is briefly not ready,
+    # falcosidekick just retries delivery.
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Official Falco Security Helm repo.
+    repoURL: https://falcosecurity.github.io/charts
+    chart: falco
+    targetRevision: 9.1.0 # chart 9.1.0 == Falco app v0.44.1; falcosidekick subchart 0.12.x
+    helm:
+      releaseName: falco
+      valuesObject:
+        # ── Driver ────────────────────────────────────────────────────────────
+        driver:
+          # modern_ebpf = CO-RE eBPF probe (see header). No kmod, no reboot.
+          kind: modern_ebpf
+
+        # ── DaemonSet scheduling ───────────────────────────────────────────────
+        # Falco is a DaemonSet: it MUST run on every node, including the tainted
+        # Standard_B2s system node (CriticalAddonsOnly) and the spot pool
+        # (scalesetpriority=spot). The DaemonSet controller only auto-tolerates
+        # the built-in node-condition taints, so these platform taints must be
+        # tolerated explicitly or Falco would silently skip those nodes — blind
+        # spots are unacceptable for a security sensor.
+        tolerations:
+          - key: CriticalAddonsOnly
+            operator: Exists
+            effect: NoSchedule
+          - key: kubernetes.azure.com/scalesetpriority
+            operator: Equal
+            value: spot
+            effect: NoSchedule
+
+        # ── Resources (ADR-0002: cost-constrained AKS Free tier) ───────────────
+        # Kept well under the chart's heavy defaults (1 CPU / 1Gi limit). This is
+        # a low-event-volume dev cluster; if the ring buffers OOM under load,
+        # raise memory limit or lower driver.modernEbpf.bufSizePreset (default 4).
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # ── falcosidekick: fan-out + the AI-RCA loop (the differentiator) ──────
+        # Enabling falcosidekick makes the chart auto-wire Falco's JSON HTTP
+        # output to it. falcosidekick then forwards each event to the outputs
+        # below. This closes the loop: runtime DETECTION (Falco) → AI ROOT-CAUSE
+        # ANALYSIS (the existing DeepSeek RCA webhook) → logs (Loki) → metrics.
+        falcosidekick:
+          enabled: true
+          # Targets below are given as explicit `service.namespace` names, which
+          # resolve cross-namespace via cluster DNS — no need to append the
+          # cluster domain.
+          fullfqdn: false
+          # WebUI pulls in Redis + a UI Deployment; skipped to stay lightweight
+          # (ADR-0002). Grafana + Loki already give us the view.
+          webui:
+            enabled: false
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          # falcosidekick is a single-replica Deployment; let it schedule onto the
+          # system/spot nodes like every other platform component.
+          tolerations:
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+            - key: kubernetes.azure.com/scalesetpriority
+              operator: Equal
+              value: spot
+              effect: NoSchedule
+          config:
+            # ── AI root-cause analysis ──────────────────────────────────────
+            # Forward Falco alerts to the existing DeepSeek RCA FastAPI service
+            # in the monitoring namespace, which turns alerts into an LLM
+            # root-cause analysis and logs it to Loki.
+            #
+            # The generic `webhook` output POSTs Falco's NATIVE event JSON
+            # ({rule, priority, output, output_fields, ...}). The DeepSeek app
+            # has a dedicated `/falco` route that parses exactly that shape and
+            # returns a containment-focused RCA (its `/webhook` route stays for
+            # Alertmanager-shaped Grafana alerts) — so runtime detections now
+            # flow end-to-end into AI analysis.
+            webhook:
+              address: "http://deepseek-webhook.monitoring:8080/falco"
+              method: "POST"
+              # Only Warning+ events hit the paid LLM webhook — keeps DeepSeek
+              # API spend down (ADR-0002) while still catching everything that
+              # matters. Loki (below) still gets the lower-severity noise.
+              minimumpriority: "warning"
+            # ── Full event log → Loki ───────────────────────────────────────
+            # hostport is the base URL; falcosidekick appends `endpoint`
+            # (/loki/api/v1/push, Loki's default push path).
+            loki:
+              hostport: "http://loki.monitoring:3100"
+              endpoint: "/loki/api/v1/push"
+              # Skip debug/informational chatter; keep notice+ in Loki. Local
+              # log storage is cheap, so this bar is lower than the webhook's.
+              minimumpriority: "notice"
+            # ── Prometheus metrics ──────────────────────────────────────────
+            # falcosidekick always exposes event counters at /metrics on its
+            # service (port 2801); this just tags them so they're queryable per
+            # cluster. See the summary for the Prometheus scrape-job caveat.
+            prometheus:
+              extralabels: "cluster:paved-road-dev"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: falco
+  syncPolicy:
+    # Platform app policy (CLAUDE.md): automated with prune + selfHeal.
+    automated:
+      prune: true
+      selfHeal: true
+    # Let ArgoCD create the `falco` namespace WITH the platform-tier label, so
+    # the privilege/namespace decision (baseline policies = Audit here, never
+    # Enforce) is declared in git rather than relying on a bare auto-created
+    # namespace. This is the GitOps-native way to label a CreateNamespace target
+    # without editing clusters/dev/namespaces/.
+    managedNamespaceMetadata:
+      labels:
+        paved-road.platform/tier: platform
+        app.kubernetes.io/part-of: platform-gitops
+    syncOptions:
+      - CreateNamespace=true
+      # Falco ships its full ruleset as large ConfigMaps; the client-side
+      # last-applied-configuration annotation can exceed the 262144-byte limit,
+      # so server-side apply is required for a clean sync (same reason as
+      # Kyverno's CRDs).
+      - ServerSideApply=true

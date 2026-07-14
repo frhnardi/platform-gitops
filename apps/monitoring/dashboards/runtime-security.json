@@ -1,0 +1,52 @@
+{
+  "title": "🛰️ Runtime Security (Falco + AI RCA)",
+  "uid": "runtime-security",
+  "tags": ["security", "runtime", "falco", "detection"],
+  "refresh": "30s",
+  "editable": true,
+  "graphTooltip": 1,
+  "timepicker": {"refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m"]},
+  "time": {"from": "now-24h", "to": "now"},
+  "panels": [
+    {
+      "id": 0, "type": "text", "title": "",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1},
+      "options": {"mode": "markdown", "content": "🛰️ **Runtime detection = defense-in-depth on top of admission-time prevention.** Falco watches syscalls; falcosidekick fans events to Prometheus, Loki, and the DeepSeek `/falco` webhook (AI containment RCA). Panels use `falcosecurity_falcosidekick_falco_events_total` — confirm the exact metric name with `curl falco-falcosidekick.falco:2801/metrics` and adjust if your falcosidekick version differs. Panels show 0 until Falco fires."}
+    },
+    {
+      "id": 1, "type": "stat", "title": "Falco Events (24h)",
+      "gridPos": {"x": 0, "y": 1, "w": 5, "h": 5},
+      "targets": [{"expr": "sum(increase(falcosecurity_falcosidekick_falco_events_total[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}}
+    },
+    {
+      "id": 2, "type": "stat", "title": "🚨 High-Severity (24h)",
+      "description": "Error / Critical / Alert / Emergency priority events — the ones the /falco AI webhook analyzes.",
+      "gridPos": {"x": 5, "y": 1, "w": 5, "h": 5},
+      "targets": [{"expr": "sum(increase(falcosecurity_falcosidekick_falco_events_total{priority=~\"(?i)error|(?i)critical|(?i)alert|(?i)emergency\"}[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 5}]}}}
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Events by Priority (10m rate)",
+      "gridPos": {"x": 10, "y": 1, "w": 14, "h": 5},
+      "targets": [{"expr": "sum by (priority) (increase(falcosecurity_falcosidekick_falco_events_total[10m])) or on() vector(0)", "legendFormat": "{{priority}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 20, "lineWidth": 2, "stacking": {"mode": "normal"}}}}
+    },
+    {
+      "id": 4, "type": "bargauge", "title": "Top Firing Rules (24h)",
+      "gridPos": {"x": 0, "y": 6, "w": 10, "h": 8},
+      "targets": [{"expr": "topk(10, sum by (rule) (increase(falcosecurity_falcosidekick_falco_events_total[24h]))) or on() vector(0)", "legendFormat": "{{rule}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"orientation": "horizontal", "displayMode": "gradient"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "orange", "value": null}]}}}
+    },
+    {
+      "id": 5, "type": "logs", "title": "🤖 AI Root-Cause Analysis for runtime events (DeepSeek /falco)",
+      "description": "The LLM containment analysis the /falco webhook logs for each Falco detection. If empty, adjust the Loki label selector to your cluster's scheme.",
+      "gridPos": {"x": 10, "y": 6, "w": 14, "h": 8},
+      "targets": [{"expr": "{namespace=\"monitoring\"} |= \"\\\"source\\\": \\\"falco\\\"\"", "refId": "A", "datasource": {"type": "loki", "uid": "loki"}}],
+      "options": {"showTime": true, "wrapLogMessage": true, "dedupStrategy": "none", "enableLogDetails": true}
+    }
+  ]
+}

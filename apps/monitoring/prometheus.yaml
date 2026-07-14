@@ -51,6 +51,15 @@ data:
           - source_labels: [__name__]
             regex: dora_.*
             action: keep
+      - job_name: falcosidekick
+        # Runtime-detection event counters (Falco -> falcosidekick). Service name
+        # is <release>-falcosidekick; the chart's releaseName is "falco".
+        static_configs:
+          - targets: ['falco-falcosidekick.falco:2801']
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: falcosecurity_.*
+            action: keep
 ---
 apiVersion: v1
 kind: ServiceAccount

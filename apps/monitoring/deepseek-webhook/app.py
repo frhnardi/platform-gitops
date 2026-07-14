@@ -20,7 +20,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from rca import api_key_configured, build_prompt
+from rca import api_key_configured, build_falco_prompt, build_prompt
 
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
@@ -60,15 +60,12 @@ async def health():
     return {"status": "ok"}
 
 
-@app.post("/webhook")
-async def webhook(request: Request):
-    body = await request.json()
-    alerts = body.get("alerts", [])
-    title = body.get("title", "No title")
-    if not alerts:
-        return JSONResponse({"status": "no alerts"})
+async def analyze(prompt: str, *, source: str, title: str, count: int):
+    """Run the prompt through the LLM, log one JSON line to Loki, and respond.
 
-    prompt = build_prompt(alerts)
+    Shared by both entry points: /webhook (Grafana/Alertmanager alerts) and
+    /falco (Falco runtime detections via falcosidekick).
+    """
     if not api_key_configured(DEEPSEEK_API_KEY):
         analysis = "DeepSeek API key not configured; set the deepseek-api-key secret."
     else:
@@ -82,11 +79,46 @@ async def webhook(request: Request):
     # One JSON line to stdout -> Promtail -> Loki.
     logging.info(json.dumps({
         "timestamp": timestamp,
+        "source": source,
         "title": title,
-        "alert_count": len(alerts),
+        "event_count": count,
         "analysis": analysis[:2000],
     }))
-    return JSONResponse({"status": "analyzed", "timestamp": timestamp, "analysis": analysis[:2000]})
+    return JSONResponse({"status": "analyzed", "source": source,
+                         "timestamp": timestamp, "analysis": analysis[:2000]})
+
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    """Grafana / Alertmanager alert batch -> RCA."""
+    body = await request.json()
+    alerts = body.get("alerts", [])
+    if not alerts:
+        return JSONResponse({"status": "no alerts"})
+    return await analyze(
+        build_prompt(alerts),
+        source="alertmanager",
+        title=body.get("title", "No title"),
+        count=len(alerts),
+    )
+
+
+@app.post("/falco")
+async def falco(request: Request):
+    """Falco runtime detection (via falcosidekick) -> containment RCA.
+
+    falcosidekick's webhook output posts a single Falco event; tolerate a list.
+    """
+    body = await request.json()
+    event = body[0] if isinstance(body, list) and body else body
+    if not isinstance(event, dict) or not event.get("rule"):
+        return JSONResponse({"status": "no event"})
+    return await analyze(
+        build_falco_prompt(event),
+        source="falco",
+        title=event.get("rule", "Falco event"),
+        count=1,
+    )
 
 
 if __name__ == "__main__":

@@ -20,5 +20,6 @@ configMapGenerator:
       - dashboards/security-posture.json
       - dashboards/cost-efficiency.json
       - dashboards/supply-chain.json
+      - dashboards/runtime-security.json
 generatorOptions:
   disableNameSuffixHash: true
