@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # The second compliant workload — proof the paved road serves more than one
+  # service and more than one language (Go sample-service, Python weather-api).
+  # Picked up by the app-of-apps root (apps/*.yaml). Sync-wave 2 so it reconciles
+  # after kyverno (0) and the policies (1): enforcement must exist before the
+  # first workload is admitted.
+  name: weather-api
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/frhnardi/platform-gitops.git
+    targetRevision: main
+    path: apps/weather-api
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apps
+  syncPolicy:
+    # App workload policy (CLAUDE.md): sync automatically and self-heal, but
+    # prune MANUALLY — deleting a manifest should not silently delete a running
+    # service.
+    automated:
+      selfHeal: true
