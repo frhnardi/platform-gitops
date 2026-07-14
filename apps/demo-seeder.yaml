@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # DEMO aid — generates admission traffic so the Supply Chain dashboard has
+  # something real to show. Picked up by the app-of-apps root (apps/*.yaml).
+  # Sync-wave 3: after kyverno (0), policies (1), and the app namespace (which
+  # sample-service, wave 2, relies on) so its rogue attempts actually hit
+  # enforcement. Remove this file to delete the seeder entirely (prune: true).
+  name: demo-seeder
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/frhnardi/platform-gitops.git
+    targetRevision: main
+    path: apps/demo-seeder
+  destination:
+    server: https://kubernetes.default.svc
+    # Resources carry explicit namespaces (demo-seeder + apps); this is only the
+    # default for any that don't.
+    namespace: demo-seeder
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

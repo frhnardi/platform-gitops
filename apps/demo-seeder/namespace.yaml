@@ -1,0 +1,11 @@
+# Demo-only. The seeder lives in its own namespace WITHOUT the
+# paved-road.platform/tier: app label, so baseline policies run in Audit here —
+# the seeder's own (unsigned, upstream) kubectl image is allowed to run. It only
+# *attempts* deploys into the app-tier `apps` namespace, where enforcement is
+# real, to generate admission traffic for the Supply Chain dashboard.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-seeder
+  labels:
+    paved-road.platform/purpose: demo
