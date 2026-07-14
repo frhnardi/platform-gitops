@@ -79,8 +79,20 @@ spec:
         - name: grafana
           image: grafana/grafana:11.6.0
           env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: admin
+            # Admin password comes from a Secret, never committed to Git. Create it
+            # once with a strong, random value (kept out of this repo):
+            #   kubectl -n monitoring create secret generic grafana-admin \
+            #     --from-literal=admin-password="$(openssl rand -base64 24)"
+            # Or sync it from Key Vault via the Secrets Store CSI driver (dogfooding,
+            # same pattern as deepseek-webhook). Grafana will not start until the
+            # secret exists — create it before this reconciles.
             - name: GF_SECURITY_ADMIN_PASSWORD
-              value: admin123
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-password
           ports:
             - containerPort: 3000
           securityContext:
