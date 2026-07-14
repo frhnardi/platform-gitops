@@ -3,7 +3,10 @@ kind: Kustomization
 # Deploy into the app tier: baseline + supply-chain policies run in Enforce here.
 namespace: apps
 resources:
-  - deployment.yaml
+  # The workload is an Argo Rollout (canary), not a Deployment. The Service's
+  # selector still matches the Rollout's pod labels — Argo Rollouts manages the
+  # canary/stable ReplicaSets under the same app.kubernetes.io/name selector.
+  - rollout.yaml
   - service.yaml
 # The golden-path promotion PR rewrites this entry on every build: it sets
 # `newName` + `digest` and deletes `newTag`, so the workload is only ever pinned

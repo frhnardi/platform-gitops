@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # Argo Rollouts — the progressive-delivery controller. It owns the Rollout CRD
+  # and drives canary/blue-green promotions for workloads that opt in (see
+  # apps/sample-service/rollout.yaml). Deployed from the official upstream chart,
+  # pinned. Managed by the app-of-apps root.
+  #
+  # Sync-wave "0" so the controller and its CRDs (Rollout, AnalysisTemplate, …)
+  # exist before any workload that declares a Rollout is reconciled. The
+  # sample-service app is wave 2, so its Rollout resource has a registered CRD to
+  # apply against — same reasoning that puts Kyverno (its own CRDs) at wave 0.
+  name: argo-rollouts
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Official Argo Rollouts Helm chart (consuming an upstream chart via ArgoCD
+    # is allowed; CLAUDE.md only forbids authoring Helm charts in this repo).
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.41.0 # chart 2.41.0 == Argo Rollouts app v1.9.0
+    helm:
+      releaseName: argo-rollouts
+      valuesObject:
+        controller:
+          # Dev is cost-constrained (ADR-0002): one controller replica.
+          # A prod overlay would restore the chart's HA defaults.
+          replicas: 1
+          # require-resource-limits applies cluster-wide: both cpu and memory
+          # requests/limits are mandatory for every controller pod.
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          # Standard platform tolerations: let the controller schedule onto the
+          # CriticalAddonsOnly system pool and onto spot scale-set nodes.
+          tolerations:
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+            - key: kubernetes.azure.com/scalesetpriority
+              operator: Equal
+              value: spot
+              effect: NoSchedule
+        # The web dashboard is an operator convenience, not part of the paved
+        # road — promotions happen via GitOps and the kubectl-argo-rollouts
+        # plugin. Keep it off to save resources.
+        dashboard:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    # Platform app policy (CLAUDE.md): automated with prune + selfHeal.
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # The Rollout CRD's schema exceeds the client-side apply annotation size
+      # limit; server-side apply is required for a clean sync (same as Kyverno).
+      - ServerSideApply=true
