@@ -56,7 +56,7 @@ spec:
           # dogfooding the same supply chain the platform enforces. Replace with
           # the promoted digest after the first golden-path build of
           # ./deepseek-webhook/.
-          image: prpacrdev.azurecr.io/deepseek-webhook@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          image: prpacrdev.azurecr.io/deepseek-webhook@sha256:4a9b147a2f83d9ca7c6578d8407eb64a505a91e04cfff0ec85036f430cb73c76
           env:
             - name: DEEPSEEK_API_KEY
               valueFrom:

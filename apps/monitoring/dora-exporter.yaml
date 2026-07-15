@@ -71,7 +71,7 @@ spec:
           # the platform's own tooling obeys the same supply-chain rules it
           # enforces on services. Replace with the promoted digest after the
           # first golden-path build of ./dora-exporter/.
-          image: prpacrdev.azurecr.io/dora-exporter@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          image: prpacrdev.azurecr.io/dora-exporter@sha256:8610521d00d768a0b3c2396d748821e478b5e9ae86d74ff1a69eab1402dd3daa
           env:
             - name: DORA_NAMESPACE
               value: apps
