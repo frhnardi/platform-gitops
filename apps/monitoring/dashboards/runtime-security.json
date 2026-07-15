@@ -1,52 +1,123 @@
 {
   "title": "🛰️ Runtime Security (Falco + AI RCA)",
   "uid": "runtime-security",
-  "tags": ["security", "runtime", "falco", "detection"],
-  "refresh": "30s",
+  "tags": ["security", "runtime", "falco", "rca", "deepseek"],
+  "refresh": "15s",
   "editable": true,
-  "graphTooltip": 1,
+  "graphTooltip": 2,
   "timepicker": {"refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m"]},
   "time": {"from": "now-24h", "to": "now"},
   "panels": [
     {
-      "id": 0, "type": "text", "title": "",
-      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1},
-      "options": {"mode": "markdown", "content": "🛰️ **Runtime detection = defense-in-depth on top of admission-time prevention.** Falco watches syscalls; falcosidekick fans events to Prometheus, Loki, and the DeepSeek `/falco` webhook (AI containment RCA). Panels use `falcosecurity_falcosidekick_falco_events_total` — confirm the exact metric name with `curl falco-falcosidekick.falco:2801/metrics` and adjust if your falcosidekick version differs. Panels show 0 until Falco fires."}
-    },
-    {
-      "id": 1, "type": "stat", "title": "Falco Events (24h)",
-      "gridPos": {"x": 0, "y": 1, "w": 5, "h": 5},
+      "id": 1, "type": "stat", "title": "📊 Total Events (24h)",
+      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 3},
       "targets": [{"expr": "sum(increase(falcosecurity_falcosidekick_falco_events_total[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}}
     },
     {
-      "id": 2, "type": "stat", "title": "🚨 High-Severity (24h)",
-      "description": "Error / Critical / Alert / Emergency priority events — the ones the /falco AI webhook analyzes.",
-      "gridPos": {"x": 5, "y": 1, "w": 5, "h": 5},
-      "targets": [{"expr": "sum(increase(falcosecurity_falcosidekick_falco_events_total{priority=~\"(?i)error|(?i)critical|(?i)alert|(?i)emergency\"}[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "id": 2, "type": "stat", "title": "🚨 Critical+High (24h)",
+      "description": "Critical + Emergency priority events — immediate attention",
+      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 3},
+      "targets": [{"expr": "sum(increase(falcosecurity_falcosidekick_falco_events_total{priority=~\"(?i)critical|(?i)emergency\"}[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 5}]}}}
     },
     {
-      "id": 3, "type": "timeseries", "title": "Events by Priority (10m rate)",
-      "gridPos": {"x": 10, "y": 1, "w": 14, "h": 5},
-      "targets": [{"expr": "sum by (priority) (increase(falcosecurity_falcosidekick_falco_events_total[10m])) or on() vector(0)", "legendFormat": "{{priority}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
-      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 20, "lineWidth": 2, "stacking": {"mode": "normal"}}}}
+      "id": 3, "type": "stat", "title": "⚠️ Warnings (24h)",
+      "description": "Warning priority events — review needed",
+      "gridPos": {"x": 8, "y": 0, "w": 3, "h": 3},
+      "targets": [{"expr": "sum(increase(falcosecurity_falcosidekick_falco_events_total{priority=~\"(?i)warning\"}[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10}, {"color": "orange", "value": 50}]}}}
     },
     {
-      "id": 4, "type": "bargauge", "title": "Top Firing Rules (24h)",
-      "gridPos": {"x": 0, "y": 6, "w": 10, "h": 8},
-      "targets": [{"expr": "topk(10, sum by (rule) (increase(falcosecurity_falcosidekick_falco_events_total[24h]))) or on() vector(0)", "legendFormat": "{{rule}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "id": 4, "type": "stat", "title": "📋 Notices (24h)",
+      "description": "Notice + Info events — informational baseline",
+      "gridPos": {"x": 11, "y": 0, "w": 3, "h": 3},
+      "targets": [{"expr": "sum(increase(falcosecurity_falcosidekick_falco_events_total{priority=~\"(?i)notice|(?i)info\"}[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}}
+    },
+    {
+      "id": 5, "type": "stat", "title": "🤖 AI RCA Analyses",
+      "description": "DeepSeek root-cause analyses triggered via /falco webhook",
+      "gridPos": {"x": 14, "y": 0, "w": 5, "h": 3},
+      "targets": [{"expr": "count(count_over_time({namespace=\"monitoring\",app=\"deepseek-webhook\"} |= \"\\\"source\\\": \\\"falco\\\"\"[24h])) or on() vector(0)", "refId": "A", "datasource": {"type": "loki", "uid": "loki"}}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "purple"}, "thresholds": {"mode": "absolute", "steps": [{"color": "purple", "value": null}]}}}
+    },
+    {
+      "id": 6, "type": "stat", "title": "🟢 Active Falco DaemonSets",
+      "description": "Falco nodes reporting — should equal node count",
+      "gridPos": {"x": 19, "y": 0, "w": 5, "h": 3},
+      "targets": [{"expr": "count(count by (hostname) (falcosecurity_falcosidekick_falco_events_total)) or on() vector(0)", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 2}]}}}
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "📈 Event Rate by Priority (5m)",
+      "description": "Rate of Falco events per 5 minutes stacked by priority",
+      "gridPos": {"x": 0, "y": 3, "w": 12, "h": 7},
+      "targets": [{"expr": "sum by (priority) (rate(falcosecurity_falcosidekick_falco_events_total[5m]))", "legendFormat": "{{priority}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 20, "lineWidth": 2, "stacking": {"mode": "normal"}, "legend": {"displayMode": "table", "placement": "right"}}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}}
+    },
+    {
+      "id": 11, "type": "timeseries", "title": "📉 Events Timeline (per namespace)",
+      "description": "Falco detections by source namespace over time",
+      "gridPos": {"x": 12, "y": 3, "w": 12, "h": 7},
+      "targets": [{"expr": "sum by (k8s_ns_name) (increase(falcosecurity_falcosidekick_falco_events_total[10m]))", "legendFormat": "{{k8s_ns_name}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 15, "lineWidth": 2, "legend": {"displayMode": "table", "placement": "right"}}}}
+    },
+    {
+      "id": 20, "type": "bargauge", "title": "🔥 Top Firing Rules (24h)",
+      "description": "Which Falco rules trigger most — investigate frequent rule hits",
+      "gridPos": {"x": 0, "y": 10, "w": 8, "h": 8},
+      "targets": [{"expr": "topk(12, sum by (rule) (increase(falcosecurity_falcosidekick_falco_events_total[24h])))", "legendFormat": "{{rule}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"orientation": "horizontal", "displayMode": "gradient", "showUnfilled": true},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "orange", "value": null}, {"color": "red", "value": 50}]}}}
+    },
+    {
+      "id": 21, "type": "bargauge", "title": "🎯 Top Affected Namespaces (24h)",
+      "description": "Namespaces generating the most Falco detections — focus your security hardening",
+      "gridPos": {"x": 8, "y": 10, "w": 8, "h": 8},
+      "targets": [{"expr": "topk(12, sum by (k8s_ns_name) (increase(falcosecurity_falcosidekick_falco_events_total[24h])))", "legendFormat": "{{k8s_ns_name}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "options": {"orientation": "horizontal", "displayMode": "gradient", "showUnfilled": true},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 20}, {"color": "red", "value": 100}]}}}
+    },
+    {
+      "id": 22, "type": "bargauge", "title": "🏷️ Top MITRE ATT&CK Tags (24h)",
+      "description": "Most frequent MITRE technique tags across all Falco detections",
+      "gridPos": {"x": 16, "y": 10, "w": 8, "h": 8},
+      "targets": [{"expr": "topk(10, sum by (tags) (increase(falcosecurity_falcosidekick_falco_events_total[24h])))", "legendFormat": "{{tags}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
       "options": {"orientation": "horizontal", "displayMode": "gradient"},
-      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "orange", "value": null}]}}}
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "purple", "value": null}]}}}
     },
     {
-      "id": 5, "type": "logs", "title": "🤖 AI Root-Cause Analysis for runtime events (DeepSeek /falco)",
-      "description": "The LLM containment analysis the /falco webhook logs for each Falco detection. If empty, adjust the Loki label selector to your cluster's scheme.",
-      "gridPos": {"x": 10, "y": 6, "w": 14, "h": 8},
-      "targets": [{"expr": "{namespace=\"monitoring\"} |= \"\\\"source\\\": \\\"falco\\\"\"", "refId": "A", "datasource": {"type": "loki", "uid": "loki"}}],
+      "id": 30, "type": "timeseries", "title": "🔍 Critical Events Detail (last 2h)",
+      "description": "Count of Critical+Warning events broken down by rule + namespace",
+      "gridPos": {"x": 0, "y": 18, "w": 24, "h": 7},
+      "targets": [{"expr": "sum by (rule, k8s_ns_name) (increase(falcosecurity_falcosidekick_falco_events_total{priority=~\"(?i)critical|(?i)warning\"}[5m]))", "legendFormat": "[{{rule}}] {{k8s_ns_name}}", "refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}}],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 20, "lineWidth": 2, "legend": {"displayMode": "table", "placement": "right", "calcs": ["sum", "max"]}}}}
+    },
+    {
+      "id": 31, "type": "table", "title": "🚨 Recent Critical Alerts (Pre-RCA)",
+      "description": "Last 50 high-severity Falco detections as they appear in Loki before AI analysis",
+      "gridPos": {"x": 0, "y": 25, "w": 12, "h": 8},
+      "targets": [{"expr": "{namespace=\"falco\"} | json | priority =~ \"(?i)critical|(?i)warning\" | line_format \"{{.rule}} | ns={{.k8s_ns_name}} pod={{.k8s_pod_name}} | {{.output}}\"", "refId": "A", "datasource": {"type": "loki", "uid": "loki"}}],
+      "options": {"showHeader": true, "sortBy": []}
+    },
+    {
+      "id": 32, "type": "logs", "title": "🤖 AI Root-Cause Analysis (DeepSeek /falco)",
+      "description": "LLM root-cause analyses from the DeepSeek RCA webhook. Each entry is a containment-focused diagnosis triggered by a Falco runtime detection.",
+      "gridPos": {"x": 12, "y": 25, "w": 12, "h": 8},
+      "targets": [{"expr": "{namespace=\"monitoring\"} |= \"source\\\": \\\"falco\" | json | line_format \"{{.title}} → {{.analysis}}\"", "refId": "A", "datasource": {"type": "loki", "uid": "loki"}}],
       "options": {"showTime": true, "wrapLogMessage": true, "dedupStrategy": "none", "enableLogDetails": true}
+    },
+    {
+      "id": 40, "type": "text", "title": "",
+      "gridPos": {"x": 0, "y": 33, "w": 24, "h": 2},
+      "options": {"mode": "markdown", "content": "### 🛡️ Defense-in-Depth Stack\n| Layer | Tool | Function |\n|---|---|---|\n| **Admission** | Kyverno | Prevents bad workloads (unsigned images, privileged pods, :latest tags, missing limits) |\n| **Runtime Detection** | Falco (eBPF) | Watches kernel syscalls on every node — catches post-exploit behavior |\n| **Fan-out** | falcosidekick | Routes events to Loki (storage), Prometheus (metrics), and DeepSeek (AI RCA) |\n| **AI RCA** | DeepSeek Webhook | LLM root-cause analysis with containment command for Warning+ events |\n| **Visualization** | Grafana | This dashboard — real-time security posture |\n\n> **Pipeline**: Falco DaemonSet → falcosidekick → Loki (all events) + DeepSeek /falco (Warning+ RCA) → Grafana"}
     }
   ]
 }
