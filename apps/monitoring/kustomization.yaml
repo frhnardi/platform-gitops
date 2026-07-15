@@ -7,8 +7,6 @@ resources:
   - loki.yaml
   - deepseek-webhook.yaml
   - dora-exporter.yaml
-  - finance-ingress.yaml
-  - argocd-ingress.yaml
   - ingress.yaml
 configMapGenerator:
   - name: grafana-dashboards
