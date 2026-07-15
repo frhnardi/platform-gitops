@@ -14,4 +14,4 @@ resources:
 images:
   - name: weather-api
     newName: prpacrdev.azurecr.io/weather-api
-    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    digest: sha256:8093f9a44a2d13b541e71efe15d88f7368f982d6c7dea51869907bdcaa4b094e
