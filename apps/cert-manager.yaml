@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # cert-manager — issues TLS certs (Let's Encrypt) for the ingress. It was
+  # installed by hand and did NOT come back on a cluster rebuild; codifying it
+  # here closes that gap. Deployed from the pinned upstream release manifest (not
+  # Helm) so ArgoCD adopts the already-running resources without a label/selector
+  # migration. Sync-wave 0: certs are a foundation other apps rely on.
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/frhnardi/platform-gitops.git
+    targetRevision: main
+    path: apps/cert-manager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # cert-manager's CRDs exceed the client-side apply annotation size limit.
+      - ServerSideApply=true
