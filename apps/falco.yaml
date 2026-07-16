@@ -158,6 +158,29 @@ spec:
             # cluster. See the summary for the Prometheus scrape-job caveat.
             prometheus:
               extralabels: "cluster:paved-road-dev"
+            # ── Real-time alerting → Telegram ───────────────────────────────
+            # Only CRITICAL+ events ping Telegram — highest signal, lowest noise
+            # (Warning+ already goes to the AI webhook; notice+ to Loki). The bot
+            # token + chat id are NOT in Git; falcosidekick reads them from the
+            # TELEGRAMTOKEN / TELEGRAMCHATID env below, sourced from the
+            # `falco-telegram` secret. Create it once:
+            #   kubectl -n falco create secret generic falco-telegram \
+            #     --from-literal=token=<bot-token> --from-literal=chatid=<chat-id>
+            telegram:
+              minimumpriority: "critical"
+            extraEnv:
+              - name: TELEGRAMTOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: falco-telegram
+                    key: token
+                    optional: true
+              - name: TELEGRAMCHATID
+                valueFrom:
+                  secretKeyRef:
+                    name: falco-telegram
+                    key: chatid
+                    optional: true
   destination:
     server: https://kubernetes.default.svc
     namespace: falco
