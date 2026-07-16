@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cert-manager
+
+# Pinned upstream release manifest (v1.16.3 — matches the version already
+# running, so ArgoCD adopts the live resources rather than migrating them) plus
+# the Let's Encrypt ClusterIssuer. Same "consume upstream, pin it" pattern the
+# ArgoCD bootstrap uses; no Helm authored here (CLAUDE.md).
+resources:
+  - https://github.com/cert-manager/cert-manager/releases/download/v1.16.3/cert-manager.yaml
+  - clusterissuer.yaml
+
+# The cost-constrained cluster taints the system node (CriticalAddonsOnly) and
+# runs workloads on the spot pool; the upstream manifest carries no tolerations,
+# so cert-manager's Deployments couldn't schedule on a freshly rebuilt cluster.
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/tolerations
+        value:
+          - {key: CriticalAddonsOnly, operator: Exists, effect: NoSchedule}
+          - {key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule}

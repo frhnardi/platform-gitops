@@ -1,0 +1,23 @@
+# Let's Encrypt production issuer, DNS-01 solver via Cloudflare.
+# sync-wave 5: applied after the cert-manager webhook is up (its admission
+# webhook validates this resource). The Cloudflare API token stays out of Git —
+# it lives in the `cloudflare-api-token` secret, created out of band (like the
+# grafana-admin and deepseek-api-key secrets).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  acme:
+    email: aardifarhann@gmail.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
